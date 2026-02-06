@@ -1,0 +1,35 @@
+domains:
+  echo.7f000001.nip.io:
+    cert: self-signed
+    sans:
+      - www.echo.7f000001.nip.io
+    upstreams:
+      api:
+        - echo:80
+    ports:
+      http: 80
+      https: 8443
+    csp: CSPCSP
+    proxy_buffer_size: 64k
+    client_max_body_size: 10m
+    client_body_buffer_size: 10k
+
+  search.7f000001.nip.io:
+    cert: self-signed
+    sans:
+      - www.search.7f000001.nip.io
+    upstreams:
+      google:
+        - google.com:443
+    locations:
+      - proxy:
+          uri: /search
+          proto: https
+          upstream: google
+          path: /
+      - alias:
+          uri: /media
+          path: /usr/local/media
+      - redirect:
+          uri: /redir
+          url: http://google.com
