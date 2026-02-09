@@ -12,11 +12,6 @@ USER root
 # are persistent
 VOLUME /etc/letsencrypt
 
-# Define a volume for /var/log
-# to make sure the analytics data
-# is persistent
-VOLUME /var/log
-
 # Install the requirements
 RUN apt-get update && apt-get install -y \
   python3 \

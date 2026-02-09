@@ -7,8 +7,6 @@ services:
       - "80:80"
       - "443:443"
       - "8443:8443"
-    volumes:
-      - smnrp_data:/etc/letsencrypt
     configs:
       - source: smnrp
         target: /run/configs/smnrp.yml

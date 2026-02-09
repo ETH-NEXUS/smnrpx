@@ -13,6 +13,7 @@ domain:
   client_max_body_size: str(required=False)
   client_body_buffer_size: str(required=False)
   allow_tls1.2: bool(required=False)
+  disable_ocsp_stapling: bool(required = False)
 
   locations: list(include('location'), required=False)
 ---

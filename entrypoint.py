@@ -21,7 +21,7 @@ DOMAIN_HASHES = path.join(LIVE, "domain_hashes.json")
 SMNRP_CONFIG = path.join(path.sep, "run", "configs", "smnrp.yml")
 NGINX_CONFIG_BASE = path.join("/", "etc", "nginx", "conf.d")
 SMNRP_NGINX_CONFIG = path.join(NGINX_CONFIG_BASE, "smnrp.conf")
-CERT_RENEW_TIMEOUT = 5 * 60
+CERT_RENEW_TIMEOUT = 24 * 60 * 60
 
 
 # Helper functions
@@ -84,7 +84,7 @@ def populate_if_not_exists(domain_name: str, filename: str):
         copy(path.join(src_dir, filename), path.join(web_root, filename))
 
 
-def print_context(filename, line_no, context=5):
+def print_context(filename: str, line_no: int, context=5):
     with open(filename) as f:
         lines = f.readlines()
 
@@ -174,6 +174,25 @@ def cert_renew():
             print("❌ Certificate renewal failed.")
 
 
+def create_dhparams(domain_name: str):
+    dhparams_file = path.join(path.sep, "etc", "letsencrypt", f"{domain_name}-dhparams.pem")
+    if not path.isfile(dhparams_file):
+        print(
+            f"✅ Creating dhparams file for domain '{domain_name}'. This will take a few minutes, be patient."
+        )
+        p_dhparam = subprocess.Popen(
+            ["openssl", "dhparam", "-out", dhparams_file, "4096"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        if p_dhparam.wait() != 0:
+            out, err = p_dhparam.communicate(timeout=1)
+            print(f"❌ Could not create dhparams file for '{domain_name}': {out}\n{err}")
+            exit(6)
+
+
 # END helper functions
 
 print("🚀 Start SMNRP 🚀")
@@ -193,6 +212,7 @@ for domain_name, domain in cfg.domains.items():
     populate_if_not_exists(domain_name, "index.html")
     populate_if_not_exists(domain_name, "favicon.ico")
     populate_if_not_exists(domain_name, "background.jpg")
+    create_dhparams(domain_name)
 
     # Prepare authentication
     if "locations" in domain:

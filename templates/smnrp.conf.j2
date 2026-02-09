@@ -48,7 +48,7 @@ server {
   ssl_certificate "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem";
   ssl_certificate_key "/etc/letsencrypt/live/{{ domain_name }}/privkey.pem";
 
-  ssl_dhparam /usr/share/nginx/ssl-dhparams.pem;
+  ssl_dhparam /etc/letsencrypt/{{domain_name}}-dhparams.pem;
 
   {% if domain["allow_tsl1.2"] %}
   ssl_protocols TLSv1.2 TLSv1.3;
@@ -63,7 +63,7 @@ server {
   ssl_session_timeout 1440m;
   ssl_session_tickets off;
 
-  {% if domain.cert and domain.cert != 'self-signed' %}
+  {% if domain.cert and domain.cert != 'self-signed' and domain.disable_ocsp_stapling %}
   ssl_stapling on;
   ssl_stapling_verify on;
   resolver 8.8.8.8 8.8.4.4 valid=300s;
