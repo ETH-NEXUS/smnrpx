@@ -4,7 +4,7 @@ import json
 import re
 import signal
 import subprocess
-from os import execvp, fork, makedirs, path, remove, waitpid
+from os import execvp, fork, makedirs, path, remove
 from pathlib import Path
 from shutil import copy, rmtree
 from sys import exit
@@ -21,7 +21,7 @@ DOMAIN_HASHES = path.join(LIVE, "domain_hashes.json")
 SMNRP_CONFIG = path.join(path.sep, "run", "configs", "smnrp.yml")
 NGINX_CONFIG_BASE = path.join("/", "etc", "nginx", "conf.d")
 SMNRP_NGINX_CONFIG = path.join(NGINX_CONFIG_BASE, "smnrp.conf")
-CERT_RENEW_TIMEOUT = 24 * 60 * 60
+CERT_RENEW_TIMEOUT = 5 * 60
 
 
 # Helper functions
@@ -147,7 +147,7 @@ def check_smnrp_config():
 
 
 def cert_renew():
-    print("✅ Starting cerbot renewal process")
+    print("🪪 Starting cerbot renewal process")
     while True:
         sleep(CERT_RENEW_TIMEOUT)
         print("🪪 Renew certificates")
@@ -326,13 +326,12 @@ check_nginx_syntax()
 
 pid = fork()
 if pid == 0:
-    # child becomes the new PID 1
+    # initiating cert renew process as a separate process
+    cert_renew()
+else:
+    # this becomes the new PID 0
     print("🙌 Starting nginx...")
     execvp(
         "nginx",
         ["nginx", "-g", "daemon off;"],
     )
-else:
-    # initiating cert renew process
-    cert_renew()
-    waitpid(pid, 0)
