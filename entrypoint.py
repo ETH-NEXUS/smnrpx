@@ -4,7 +4,7 @@ import json
 import re
 import signal
 import subprocess
-from os import execvp, fork, makedirs, path, remove
+from os import environ, execvp, fork, makedirs, path, remove
 from pathlib import Path
 from shutil import copy, rmtree
 from sys import exit
@@ -196,6 +196,17 @@ def create_dhparams(domain_name: str):
 # END helper functions
 
 print("🚀 Start SMNRP 🚀")
+
+# Get config from SMNRP environment variable if set
+if "SMNRP" in environ:
+    SMNRP_CONFIG = path.join(path.sep, "tmp", "smnrp.yml")
+    env_config = environ.get("SMNRP")
+    if env_config:
+        out_path = Path(SMNRP_CONFIG)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(env_config, encoding="utf-8")
+        print("✅ Take config from environment variable 'SMNRP'")
+
 check_smnrp_config()
 with open(SMNRP_CONFIG) as config:
     cfg = Box(yaml.safe_load(config))
