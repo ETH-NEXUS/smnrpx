@@ -4,10 +4,11 @@ import json
 import re
 import signal
 import subprocess
-from os import execvp, makedirs, path, remove
+from os import execvp, fork, makedirs, path, remove, waitpid
 from pathlib import Path
 from shutil import copy, rmtree
 from sys import exit
+from time import sleep
 
 import yamale
 import yaml
@@ -20,6 +21,7 @@ DOMAIN_HASHES = path.join(LIVE, "domain_hashes.json")
 SMNRP_CONFIG = path.join(path.sep, "run", "configs", "smnrp.yml")
 NGINX_CONFIG_BASE = path.join("/", "etc", "nginx", "conf.d")
 SMNRP_NGINX_CONFIG = path.join(NGINX_CONFIG_BASE, "smnrp.conf")
+CERT_RENEW_TIMEOUT = 24 * 60 * 60
 
 
 # Helper functions
@@ -142,6 +144,34 @@ def check_smnrp_config():
                 for error in result.errors:
                     print("-", error)
             exit(4)
+
+
+def cert_renew():
+    print("✅ Starting cerbot renewal process")
+    while True:
+        sleep(CERT_RENEW_TIMEOUT)
+        print("🪪 Renew certificates")
+        if path.isfile(path.join(path.sep, "tmp", "letsencrypt.log")):
+            remove(path.join(path.sep, "tmp", "letsencrypt.log"))
+        certbot = subprocess.Popen(
+            [
+                "certbot",
+                "renew",
+                "--non-interactive",
+                "--log",
+                "/tmp",
+                "--deploy-hook",
+                "nginx -s reload",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        out, err = certbot.communicate(timeout=1)
+        print(f"{out}")
+        if certbot.poll() != 0:
+            print(f"{err}")
+            print("❌ Certificate renewal failed.")
 
 
 # END helper functions
@@ -293,8 +323,16 @@ with open(SMNRP_NGINX_CONFIG, "w") as config:
     config.write(template.render(certrequest=False, domains=cfg.domains))
 
 check_nginx_syntax()
-print("🙌 starting nginx...")
-execvp(
-    "nginx",
-    ["nginx", "-g", "daemon off;"],
-)
+
+pid = fork()
+if pid == 0:
+    # child becomes the new PID 1
+    print("🙌 Starting nginx...")
+    execvp(
+        "nginx",
+        ["nginx", "-g", "daemon off;"],
+    )
+else:
+    # initiating cert renew process
+    cert_renew()
+    waitpid(pid, 0)
