@@ -137,7 +137,7 @@ def check_smnrp_config():
             yamale.validate(schema, config)
             print("✅ SMNRP configuration is valid")
         except YamaleError as e:
-            print("❌ SMNRP validation failed")
+            print("❌ SMNRP configuration validation failed")
             for result in e.results:
                 for error in result.errors:
                     print("-", error)
@@ -231,7 +231,7 @@ for domain_name, domain in cfg.domains.items():
             path.join(live, "csr.conf"),
         ]
         subprocess.run(cmd, check=True)
-    elif domain.cert == "own":
+    elif "cert" in domain and domain.cert == "own":
         print("✅ using own certificate for {domain_name}")
     else:
         print("✅ requesting certificate from letsencrypt for {domain_name}")
