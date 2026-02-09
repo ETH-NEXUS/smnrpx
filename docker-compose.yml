@@ -10,6 +10,7 @@ services:
     configs:
       - source: smnrp
         target: /run/configs/smnrp.yml
+    env_file: .env
   echo:
     platform: linux/amd64
     image: kennethreitz/httpbin
