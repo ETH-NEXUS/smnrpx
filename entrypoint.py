@@ -267,6 +267,8 @@ for domain_name, domain in cfg.domains.items():
                 "4096",
                 "--agree-tos",
                 "--force-renewal",
+                "--log",
+                "/dev/stdout",
             ]
             subprocess.run(cmd, check=True)
 
