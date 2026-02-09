@@ -9,12 +9,17 @@ services:
       - "8443:8443"
     volumes:
       - smnrp_data:/etc/letsencrypt
-    env_file: .env
+    configs:
+      - source: smnrp
+        target: /run/configs/smnrp.yml
   echo:
     platform: linux/amd64
     image: kennethreitz/httpbin
     environment:
       TZ: "Europe/Zurich"
+configs:
+  smnrp:
+    file: ./smnrp.yml
   #   depends_on:
   #     - mail
   # mail:

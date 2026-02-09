@@ -1,0 +1,64 @@
+domains: map(include('domain'), required=True)
+---
+domain:
+  cert: enum('self-signed', 'own', required=False)
+  sans: list(str(), required=False)
+
+  upstreams: map(list(str()), required=False)
+
+  ports: include('ports', required=False)
+
+  csp: str(required=False)
+  proxy_buffer_size: str(required=False)
+  client_max_body_size: str(required=False)
+  client_body_buffer_size: str(required=False)
+  allow_tls1.2: bool(required=False)
+
+  locations: list(include('location'), required=False)
+---
+ports:
+  http: int(required=False)
+  https: int(required=False)
+---
+location: any(include('proxy_loc'), include('alias_loc'), include('redirect_loc'))
+
+---
+proxy_loc:
+  proxy: include('proxy')
+---
+proxy:
+  uri: str(required=True)
+  proto: str(required=True)
+  upstream: str(required=True)
+  path: str(required=True)
+  whitelist: list(str(), required=False)
+  auth: include('auth', required=False)
+  custom: list(str(), required=False)
+  disable_cache: bool(required=False)
+  disable_default_headers: bool(required=False)
+---
+alias_loc:
+  alias: include('alias')
+---
+alias:
+  uri: str(required=True)
+  path: str(required=True)
+  internal: bool(required=False)
+  try_files: bool(required=False)
+  whitelist: list(str(), required=False)
+  auth: include('auth', required=False)
+  custom: list(str(), required=False)
+  disable_cache: bool(required=False)
+---
+redirect_loc:
+  redirect: include('redirect')
+---
+redirect:
+  uri: str(required=True)
+  url: str(required=True)
+---
+auth: list(include('user_pass'), required=True)
+---
+user_pass:
+  user: str(required=True)
+  password: str(required=True)

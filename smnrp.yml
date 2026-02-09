@@ -13,6 +13,7 @@ domains:
     proxy_buffer_size: 64k
     client_max_body_size: 10m
     client_body_buffer_size: 10k
+    allow_tls1.2: true
 
   search.7f000001.nip.io:
     cert: self-signed
@@ -23,13 +24,28 @@ domains:
         - google.com:443
     locations:
       - proxy:
+          disable_cache: true
           uri: /search
           proto: https
           upstream: google
           path: /
+          auth:
+            - user: admin
+              password: admin
+            - user: dave
+              password: secret
+          whitelist:
+            - 127.0.0.1
+          custom:
+            - proxy_set_header Host $http_host
       - alias:
           uri: /media
           path: /usr/local/media
+          internal: true
+          try_files: true
+          auth:
+            - user: user
+              password: user
       - redirect:
           uri: /redir
           url: http://google.com

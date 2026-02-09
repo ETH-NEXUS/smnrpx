@@ -206,6 +206,7 @@ dependencies = [
     { name = "jinja2" },
     { name = "python-box", extra = ["all"] },
     { name = "pyyaml" },
+    { name = "yamale" },
 ]
 
 [package.metadata]
@@ -213,6 +214,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "python-box", extras = ["all"], specifier = "~=7.0" },
     { name = "pyyaml", specifier = "==6.0.3" },
+    { name = "yamale", specifier = ">=6.1.0" },
 ]
 
 [[package]]
@@ -222,4 +224,16 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/be/ba/1f744cdc819428fc6b5084ec34d9b30660f6f9daaf70eead706e3203ec3c/toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f", size = 22253 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/44/6f/7120676b6d73228c96e17f1f794d8ab046fc910d781c8d151120c3f1569e/toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b", size = 16588 },
+]
+
+[[package]]
+name = "yamale"
+version = "6.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/da/64/9e5de0e829920b848dcf5fe3ff64936d83cc7471babd264588b08bca97e0/yamale-6.1.0.tar.gz", hash = "sha256:fd435aa7b830c73e89a9ef548c0ace2d3d8dc3e5e180e6b57ff70b31495672fd", size = 42402 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c9/fc/cbad39af7e761525077690ddff1ae19ace7e2f54552e90fb848a43a270fa/yamale-6.1.0-py3-none-any.whl", hash = "sha256:7e109c9d83e3a7e42703516cb2b70b9c7aa5b7a738019c4a6c202b6b0b9096c5", size = 58215 },
 ]

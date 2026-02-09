@@ -1,20 +1,25 @@
 #! /usr/bin/env python3
 import hashlib
 import json
+import re
 import signal
 import subprocess
-from os import environ, execvp, makedirs, path
+from os import execvp, makedirs, path, remove
 from pathlib import Path
-from shutil import rmtree
+from shutil import copy, rmtree
 from sys import exit
 
+import yamale
 import yaml
 from box import Box
 from jinja2 import Environment, FileSystemLoader
+from yamale.yamale_error import YamaleError
 
 LIVE = path.join("/", "etc", "letsencrypt", "live")
 DOMAIN_HASHES = path.join(LIVE, "domain_hashes.json")
-SMNRP_CONFIG = path.join("/", "etc", "nginx", "conf.d", "smnrp.conf")
+SMNRP_CONFIG = path.join(path.sep, "run", "configs", "smnrp.yml")
+NGINX_CONFIG_BASE = path.join("/", "etc", "nginx", "conf.d")
+SMNRP_NGINX_CONFIG = path.join(NGINX_CONFIG_BASE, "smnrp.conf")
 
 
 # Helper functions
@@ -69,28 +74,144 @@ def get_domain_hash(store_path: str, domain_name: str) -> str | None:
     return str(val) if val is not None else None
 
 
+def populate_if_not_exists(domain_name: str, filename: str):
+    web_root = path.join(path.sep, "web_root", domain_name)
+    makedirs(web_root, exist_ok=True)
+    src_dir = path.join(path.sep, "usr", "share", "nginx")
+    if not path.isfile(path.join(web_root, filename)):
+        copy(path.join(src_dir, filename), path.join(web_root, filename))
+
+
+def print_context(filename, line_no, context=5):
+    with open(filename) as f:
+        lines = f.readlines()
+
+    start = max(0, line_no - context - 1)
+    end = min(len(lines), line_no + context)
+
+    for i in range(start, end):
+        prefix = ">" if i == line_no - 1 else " "
+        print(f"{prefix}{i + 1:5}: {lines[i].rstrip()}")
+
+
+def check_nginx_syntax():
+    # Check nginx config syntax, exit in case of errors
+    nginx = subprocess.Popen(
+        ["nginx", "-t"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if nginx.wait() != 0:
+        out, err = nginx.communicate(timeout=1)
+        print("❌ nginx configuration issues:")
+        print(f"{out}\n{err}")
+        pattern = re.compile(rf"{re.escape(SMNRP_NGINX_CONFIG)}:(\d+)")
+        for line in err.splitlines():
+            m = pattern.search(line)
+            if m:
+                print_context(SMNRP_NGINX_CONFIG, int(m.group(1)))
+                break
+        exit(2)
+    else:
+        print("✅ nginx configuration is ok")
+
+
+def check_smnrp_config():
+    if not path.isfile(SMNRP_CONFIG):
+        print("❌ SMNRP config is missing")
+        print("👉 Please configure the config in docker-compose.yml:")
+        print("configs:")
+        print("  smnrp:")
+        print("    file: ./smnrp.yml")
+        print("services:")
+        print("  ws:")
+        print("    configs:")
+        print("      - source: smnrp")
+        print(f"        target: {SMNRP_CONFIG}")
+        exit(1)
+    else:
+        try:
+            schema = yamale.make_schema("/smnrp_schema.yml")
+            config = yamale.make_data(SMNRP_CONFIG)
+            yamale.validate(schema, config)
+            print("✅ SMNRP configuration is valid")
+        except YamaleError as e:
+            print("❌ SMNRP validation failed")
+            for result in e.results:
+                for error in result.errors:
+                    print("-", error)
+            exit(4)
+
+
 # END helper functions
 
-if "SMNRP" not in environ:
-    print("SMNRP environment variable not set")
-    exit(1)
-else:
-    cfg = Box(yaml.safe_load(environ["SMNRP"]))
-    # with open("smnrp.yml") as config:
-    #     cfg = Box(yaml.safe_load(config))
+print("🚀 Start SMNRP 🚀")
+check_smnrp_config()
+with open(SMNRP_CONFIG) as config:
+    cfg = Box(yaml.safe_load(config))
 
+# Create templating environment
 env = Environment(loader=FileSystemLoader("templates"), trim_blocks=True, lstrip_blocks=True)
-template = env.get_template("smnrp.conf.j2")
+
+# Remove default nginx config
+if path.isfile(path.join(NGINX_CONFIG_BASE, "default.conf")):
+    remove(path.join(NGINX_CONFIG_BASE, "default.conf"))
 
 for domain_name, domain in cfg.domains.items():
+    # Copy over default files
+    populate_if_not_exists(domain_name, "index.html")
+    populate_if_not_exists(domain_name, "favicon.ico")
+    populate_if_not_exists(domain_name, "background.jpg")
+
+    # Prepare authentication
+    if "locations" in domain:
+        for _location in domain.locations:
+            _, location = next(iter(_location.items()))
+            if "auth" in location:
+                auth_config = path.join(
+                    NGINX_CONFIG_BASE,
+                    f".auth_{domain_name}{location.uri.replace(path.sep, '_')}",
+                )
+                if path.isfile(auth_config):
+                    remove(auth_config)
+                for auth in location.auth:
+                    try:
+                        print(
+                            f"👤 enable authentication on '{domain_name}{location.uri}' for user '{auth.user}', {auth_config}"
+                        )
+                        subprocess.run(
+                            [
+                                "htpasswd",
+                                "-b",
+                                *([] if path.isfile(auth_config) else ["-c"]),
+                                auth_config,
+                                auth.user,
+                                auth.password,
+                            ],
+                            check=True,
+                        )
+                    except subprocess.CalledProcessError:
+                        print(f"❌ Cannot create auth file for '{auth_config}'")
+                        exit(5)
+
+    # Hash management of domain configs
+    new_hash = compute_domain_hash(domain_name, domain)
+    old_hash = get_domain_hash(DOMAIN_HASHES, domain_name)
+    if new_hash == old_hash and path.isfile(path.join(LIVE, domain_name, "fullchain.pem")):
+        # in this case we do not need to renew the certificate
+        continue
+    # let's create a new certificate
+    store_domain_hash(DOMAIN_HASHES, domain_name, domain)
     # Generate self-signed certificates if needed
     if "cert" in domain and domain.cert == "self-signed":
+        print("✅ using self-signed certificate for {domain_name}")
         live = f"{LIVE}/{domain_name}"
         makedirs(live, exist_ok=True)
         csr_config = path.join(live, "csr.conf")
         if not path.exists(csr_config):
-            template = env.get_template("csr.conf.j2")
             with open(csr_config, "w") as csr:
+                template = env.get_template("csr.conf.j2")
                 csr.write(template.render(domain_name=domain_name, domain=domain))
 
         cmd = [
@@ -110,76 +231,68 @@ for domain_name, domain in cfg.domains.items():
             path.join(live, "csr.conf"),
         ]
         subprocess.run(cmd, check=True)
+    elif domain.cert == "own":
+        print("✅ using own certificate for {domain_name}")
     else:
-        # Hash management of domain configs
-        new_hash = compute_domain_hash(domain_name, domain)
-        old_hash = get_domain_hash(DOMAIN_HASHES, domain_name)
-        if new_hash != old_hash or not path.isfile(path.join(LIVE, domain_name, "fullchain.pem")):
-            store_domain_hash(DOMAIN_HASHES, domain_name, domain)
-            # Prepare for cert request
-            with open(SMNRP_CONFIG, "w") as config:
-                config.write(template.render(certrequest=True, domains=cfg.domains))
-            nginx_syntax_check = subprocess.run(["nginx", "-t"], check=True)
-            if nginx_syntax_check.returncode != 0:
-                print("!!! Configuration issues !!!")
-                exit(2)
-            else:
-                # Start intermediate nginx
-                nginx = subprocess.Popen(
-                    [
-                        "nginx",
-                        "-g",
-                        "daemon off;",
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
-                if nginx.poll() is not None:
-                    out, err = nginx.communicate(timeout=1)
-                    raise RuntimeError(f"nginx failed to start.\nstdout:\n{out}\nstderr:\n{err}")
-            try:
-                cmd = [
-                    "certbot",
-                    "certonly",
-                    "--webroot",
-                    "-w",
-                    "/var/www/certbot",
-                    "--register-unsafely-without-email",
-                    "-d",
-                    f"{domain_name},{','.join(domain.sans)}",
-                    "--rsa-key-size",
-                    "4096",
-                    "--agree-tos",
-                    "--force-renewal",
-                ]
-                subprocess.run(cmd, check=True)
+        print("✅ requesting certificate from letsencrypt for {domain_name}")
+        with open(SMNRP_NGINX_CONFIG, "w") as config:
+            template = env.get_template("smnrp.conf.j2")
+            config.write(template.render(certrequest=True, domains=cfg.domains))
+        check_nginx_syntax()
+        # Start intermediate nginx
+        nginx = subprocess.Popen(
+            [
+                "nginx",
+                "-g",
+                "daemon off;",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if nginx.poll() is not None:
+            out, err = nginx.communicate(timeout=1)
+            raise RuntimeError(f"nginx failed to start.\nstdout:\n{out}\nstderr:\n{err}")
+        try:
+            cmd = [
+                "certbot",
+                "certonly",
+                "--webroot",
+                "-w",
+                "/var/www/certbot",
+                "--register-unsafely-without-email",
+                "-d",
+                f"{domain_name},{','.join(domain.sans)}",
+                "--rsa-key-size",
+                "4096",
+                "--agree-tos",
+                "--force-renewal",
+            ]
+            subprocess.run(cmd, check=True)
 
-                # Kill nginx
-                if nginx.poll() is None:
-                    nginx.send_signal(signal.SIGTERM)
-                try:
-                    nginx.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    nginx.kill()
-                    nginx.wait()
-            except subprocess.CalledProcessError:
-                print(f"!!! Cannot request certificate for domain '{domain_name}' !!!")
-                if path.isdir(path.join(LIVE, domain_name)):
-                    rmtree(path.join(LIVE, domain_name))
-                exit(3)
+            # Kill nginx
+            if nginx.poll() is None:
+                nginx.send_signal(signal.SIGTERM)
+            try:
+                nginx.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                nginx.kill()
+                nginx.wait()
+        except subprocess.CalledProcessError:
+            print(f"❌ Cannot request certificate for domain '{domain_name}'")
+            if path.isdir(path.join(LIVE, domain_name)):
+                rmtree(path.join(LIVE, domain_name))
+            exit(3)
 
 # Create final nginx config and replace entrypoint with nginx
-with open(SMNRP_CONFIG, "w") as config:
+
+with open(SMNRP_NGINX_CONFIG, "w") as config:
+    template = env.get_template("smnrp.conf.j2")
     config.write(template.render(certrequest=False, domains=cfg.domains))
 
-# Check nginx config syntax, exit in case of errors
-nginx_syntax_check = subprocess.run(["nginx", "-t"], check=True)
-if nginx_syntax_check.returncode != 0:
-    print("!!! Configuration issues !!!")
-    exit(2)
-else:
-    execvp(
-        "nginx",
-        ["nginx", "-g", "daemon off;"],
-    )
+check_nginx_syntax()
+print("🙌 starting nginx...")
+execvp(
+    "nginx",
+    ["nginx", "-g", "daemon off;"],
+)

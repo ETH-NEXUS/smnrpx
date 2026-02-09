@@ -1,6 +1,8 @@
 FROM nginx:1.29.3
 
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 
+ENV PIP_NO_CACHE_DIR=1
+ENV PYTHONUNBUFFERED=1
 
 # All following commands are done as root
 USER root
@@ -22,7 +24,12 @@ RUN apt-get update && apt-get install -y \
   certbot \
   python3-certbot-nginx \
   inotify-tools \
-  vim
+  apache2-utils
+
+# Install debugging tools
+RUN apt-get install -y \
+  vim \
+  procps
   
 # Clean up the apt cache
 RUN apt-get clean autoclean && apt-get autoremove -y && rm -rf /var/lib/{apt,dpkg,cache,log}/
@@ -71,6 +78,7 @@ COPY ./reloader.sh /reloader.sh
 COPY ./renewer.sh /renewer.sh
 COPY ./smnrp_reset /smnrp_reset
 COPY ./templates /templates
+COPY ./smnrp_schema.yml /smnrp_schema.yml
 RUN chmod 755 /entrypoint.py /analyser.sh /reloader.sh /renewer.sh /smnrp_reset
 
 # let the smnrp user own the needed files and dirs
