@@ -1,6 +1,6 @@
 domains:
   echo.7f000001.nip.io:
-    cert: self-signed
+    # cert: self-signed
     sans:
       - www.echo.7f000001.nip.io
     upstreams:

@@ -28,7 +28,7 @@ CERT_RENEW_TIMEOUT = 5 * 60
 def _stable_signature(domain_name: str, domain) -> str:
     # Sort SANs so ordering in YAML doesn't change the hash
     sans_norm = sorted(str(s).strip() for s in (domain.get("sans", [])))
-    return f"{domain_name}|{json.dumps(sans_norm, separators=(',', ':'), ensure_ascii=False)}"
+    return f"{domain_name}|{domain.cert if 'cert' in domain else ''}|{json.dumps(sans_norm, separators=(',', ':'), ensure_ascii=False)}"
 
 
 def compute_domain_hash(domain_name: str, domain) -> str:
@@ -298,7 +298,7 @@ for domain_name, domain in cfg.domains.items():
                 "--agree-tos",
                 "--force-renewal",
                 "--log",
-                "/dev/stdout",
+                "/tmp",
             ]
             subprocess.run(cmd, check=True)
 
