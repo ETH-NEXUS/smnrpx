@@ -42,9 +42,8 @@ COPY ./nginx/favicon.ico /usr/share/nginx/favicon.ico
 # Create the webroot for certbot
 RUN mkdir -p /var/www/certbot
 
-# Add the dh-params to the image
+# Create letsencrypt directory
 RUN mkdir -p /etc/letsencrypt
-COPY ./ssl-dhparams.pem /usr/share/nginx/ssl-dhparams.pem
 
 # Copy the nginx configurtion files
 COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
@@ -68,20 +67,14 @@ RUN groupadd --gid 1000 smnrp \
 
 # Copy the entrypoint
 COPY ./entrypoint.py /entrypoint.py
-COPY ./analyser.sh /analyser.sh
-COPY ./reloader.sh /reloader.sh
-COPY ./renewer.sh /renewer.sh
 COPY ./smnrp_reset /smnrp_reset
 COPY ./templates /templates
 COPY ./smnrp_schema.yml /smnrp_schema.yml
-RUN chmod 755 /entrypoint.py /analyser.sh /reloader.sh /renewer.sh /smnrp_reset
+RUN chmod 755 /entrypoint.py /smnrp_reset
 
 # let the smnrp user own the needed files and dirs
 RUN chown -R smnrp:smnrp \
   /entrypoint.py \
-  /analyser.sh \
-  /reloader.sh \
-  /renewer.sh \
   /smnrp_reset \
   /etc/nginx/conf.d \
   /var/cache/nginx \

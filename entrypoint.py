@@ -147,7 +147,7 @@ def check_smnrp_config():
             yamale.validate(schema, config)
             print("✅ SMNRP configuration is valid")
         except YamaleError as e:
-            print("❌ SMNRP configuration validation failed")
+            print("❌ SMNRP configuration validation failed, findings:")
             for result in e.results:
                 for error in result.errors:
                     print("-", error)

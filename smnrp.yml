@@ -1,26 +1,31 @@
 domains:
   echo.7f000001.nip.io:
-    cert: self-signed
     disable_https: true
     sans:
       - www.echo.7f000001.nip.io
     upstreams:
       api:
         - echo:80
-    ports:
-      http: 80
-      https: 8443
-    csp: CSPCSP
-    proxy_buffer_size: 64k
-    client_max_body_size: 10m
-    client_body_buffer_size: 10k
-    allow_tls1.2: true
-    disable_ocsp_stapling: true
+    locations:
+      - proxy:
+          uri: /
+          proto: http
+          upstream: api
+          path: /
+    csp: "default-src 'self' http: https: data: blob: 'unsafe-inline'"
+    proxy_buffer_size: 32k
+    client_max_body_size: 1m
+    client_body_buffer_size: 1k
+    allow_tls1.2: false
+    disable_ocsp_stapling: false
 
   search.7f000001.nip.io:
     cert: self-signed
     sans:
       - www.search.7f000001.nip.io
+    ports:
+      http: 80
+      https: 8443
     upstreams:
       google:
         - google.com:443
