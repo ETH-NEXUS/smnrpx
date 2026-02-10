@@ -49,7 +49,96 @@ SMNRP="
 "
 ```
 
-Let's start with some examples.
+Let's start with a full examples.
+
+```yaml
+domains:
+  # The name of the domain (used as *cn* in the certificate)
+  dom.org:
+    # If not defined, the certificate will be requested from Let's Encrypt
+    # cert: self-signed
+    # Subject alternative names (SAN) (other names for the **same** domain)
+    sans:
+      - www.dom.org
+    # Upstreams
+    upstreams:
+      # Name of the upstream (freely eligible)
+      api:
+        # List of host:port combinations to define the upstream servers
+        - echo:80
+    # Ports to listen on (one for http and one for https traffic)
+    ports:
+      http: 80
+      https: 8443
+    # The Content Security Policy for this domain
+    csp: default-src 'self' http: https: data: blob: 'unsafe-inline'
+    # Hardening parameters (please read the details below)
+    proxy_buffer_size: 64k
+    client_max_body_size: 10m
+    client_body_buffer_size: 10k
+    allow_tls1.2: true
+    disable_ocsp_stapling: true
+
+  search.7f000001.nip.io:
+    # The certificate is created as a self-signed one by SMNRPX,
+    # if set to 'own' you need to map you own certificates to the right path
+    cert: self-signed
+    sans:
+      - www.search.7f000001.nip.io
+    upstreams:
+      google:
+        - google.com:443
+    # Locations defined by type (proxy, alias, redirect)
+    locations:
+        # A proxy location defines what uri is proxied to what target (basically an upstream)
+      - proxy:
+          # Set headers to disable browser cache (helpful while developing web apps)
+          disable_cache: true
+          # What uri to proxy,
+          uri: /search
+          # over which protocol,
+          proto: https
+          # to what upstream,
+          upstream: google
+          # and what path
+          path: /
+          # The location should be password protected (by basic authentication),
+          auth:
+              # with this user,
+            - user: admin
+              # and this password
+              password: secret
+          # Only allow access to this location from the listed networks
+          whitelist:
+            - 127.0.0.1/32
+          # Add custom configuration lines to this location (e.g. additional proxy headers)
+          custom:
+            - proxy_set_header Host $http_host
+        # The alias location maps a uri to a local filesystem path
+      - alias:
+          # The uri to map,
+          uri: /media
+          # to what local filesystem path
+          path: /usr/local/media
+          # Add internal clause to the location
+          internal: true
+          # Add try_files clause to the location
+          try_files: true
+          # The location should be password protected (by basic authentication),
+          auth:
+              # with this user,
+            - user: user
+              # and this password
+              password: user
+        # The redirect location redirects all traffic to a different url with a 301 HTTP status code
+      - redirect:
+          # The uri to redirect,
+          uri: /redir
+          # to this new location, trowing a 301 HTTP status code
+          url: http://google.com
+```
+
+We follow with some additional minimal examples.
 
 ## Examples
 
