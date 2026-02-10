@@ -1,4 +1,4 @@
 build:
-	@docker build --no-cache . -t ethnexus/smnrp
+	@docker build --no-cache . -t ethnexus/smnrpx
 docker: build
-	@docker push ethnexus/smnrp
+	@docker push ethnexus/smnrpx
