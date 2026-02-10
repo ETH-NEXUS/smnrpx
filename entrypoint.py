@@ -22,6 +22,14 @@ SMNRP_CONFIG = path.join(path.sep, "run", "configs", "smnrp.yml")
 NGINX_CONFIG_BASE = path.join("/", "etc", "nginx", "conf.d")
 SMNRP_NGINX_CONFIG = path.join(NGINX_CONFIG_BASE, "smnrp.conf")
 CERT_RENEW_TIMEOUT = 24 * 60 * 60
+DEFAULTS = {
+    "server_tokens": "off",
+    "proxy_buffer_size": "32k",
+    "client_max_body_size": "1m",
+    "client_body_buffer_size": "1k",
+    "allow_tls1_2": False,
+    "disable_ocsp_stapling": False,
+}
 
 
 # Helper functions
@@ -193,6 +201,13 @@ def create_dhparams(domain_name: str):
             exit(6)
 
 
+def apply_defaults(cfg: Box) -> Box:
+    for k, v in DEFAULTS.items():
+        if k not in cfg:
+            cfg[k] = v
+    return cfg
+
+
 # END helper functions
 
 print("🚀 Start SMNRP 🚀")
@@ -210,6 +225,9 @@ if "SMNRP" in environ:
 check_smnrp_config()
 with open(SMNRP_CONFIG) as config:
     cfg = Box(yaml.safe_load(config))
+
+# Apply config defaults to be most secure
+cfg = apply_defaults(cfg)
 
 # Create templating environment
 env = Environment(loader=FileSystemLoader("templates"), trim_blocks=True, lstrip_blocks=True)

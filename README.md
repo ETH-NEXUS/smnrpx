@@ -73,9 +73,10 @@ domains:
     # The Content Security Policy for this domain
     csp: default-src 'self' http: https: data: blob: 'unsafe-inline'
     # Hardening parameters (please read the details below)
-    proxy_buffer_size: 64k
-    client_max_body_size: 10m
-    client_body_buffer_size: 10k
+    server_tokens: off
+    proxy_buffer_size: 32k
+    client_max_body_size: 1m
+    client_body_buffer_size: 1k
     allow_tls1.2: true
     disable_ocsp_stapling: true
 
