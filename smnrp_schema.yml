@@ -9,6 +9,7 @@ domain:
   ports: include('ports', required=False)
 
   csp: str(required=False)
+  server_tokens: enum('off', 'on', required=False)
   proxy_buffer_size: str(required=False)
   client_max_body_size: str(required=False)
   client_body_buffer_size: str(required=False)
