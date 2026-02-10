@@ -274,96 +274,100 @@ for domain_name, domain in cfg.domains.items():
                         print(f"❌ Cannot create auth file for '{auth_config}'")
                         exit(5)
 
-    # Hash management of domain configs
-    new_hash = compute_domain_hash(domain_name, domain)
-    old_hash = get_domain_hash(DOMAIN_HASHES, domain_name)
-    if new_hash == old_hash and path.isfile(path.join(LIVE, domain_name, "fullchain.pem")):
-        # in this case we do not need to renew the certificate
-        continue
-    # let's create a new certificate
-    store_domain_hash(DOMAIN_HASHES, domain_name, domain)
-    # Generate self-signed certificates if needed
-    if "cert" in domain and domain.cert == "self-signed":
-        print("✅ using self-signed certificate for {domain_name}")
-        live = f"{LIVE}/{domain_name}"
-        makedirs(live, exist_ok=True)
-        csr_config = path.join(live, "csr.conf")
-        if not path.exists(csr_config):
-            with open(csr_config, "w") as csr:
-                template = env.get_template("csr.conf.j2")
-                csr.write(template.render(domain_name=domain_name, domain=domain))
-
-        cmd = [
-            "openssl",
-            "req",
-            "-x509",
-            "-nodes",
-            "-days",
-            "3650",
-            "-newkey",
-            "rsa:4096",
-            "-keyout",
-            path.join(live, "privkey.pem"),
-            "-out",
-            path.join(live, "fullchain.pem"),
-            "-config",
-            path.join(live, "csr.conf"),
-        ]
-        subprocess.run(cmd, check=True)
-    elif "cert" in domain and domain.cert == "own":
-        print("✅ using own certificate for {domain_name}")
+    if "disable_https" in domain and domain.disable_https:
+        print(f"⚠️ HTTPS is disabled for domain '{domain_name}'")
+        # Hash management of domain configs
+        new_hash = compute_domain_hash(domain_name, domain)
+        old_hash = get_domain_hash(DOMAIN_HASHES, domain_name)
+        if new_hash == old_hash and path.isfile(path.join(LIVE, domain_name, "fullchain.pem")):
+            # in this case we do not need to renew the certificate
+            continue
+        # let's create a new certificate
+        store_domain_hash(DOMAIN_HASHES, domain_name, domain)
+        # Generate self-signed certificates if needed
     else:
-        print("✅ requesting certificate from letsencrypt for {domain_name}")
-        with open(SMNRP_NGINX_CONFIG, "w") as config:
-            template = env.get_template("smnrp.conf.j2")
-            config.write(template.render(certrequest=True, domains=cfg.domains))
-        check_nginx_syntax()
-        # Start intermediate nginx
-        nginx = subprocess.Popen(
-            [
-                "nginx",
-                "-g",
-                "daemon off;",
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        if nginx.poll() is not None:
-            out, err = nginx.communicate(timeout=1)
-            raise RuntimeError(f"nginx failed to start.\nstdout:\n{out}\nstderr:\n{err}")
-        try:
+        if "cert" in domain and domain.cert == "self-signed":
+            print(f"✅ using self-signed certificate for {domain_name}")
+            live = f"{LIVE}/{domain_name}"
+            makedirs(live, exist_ok=True)
+            csr_config = path.join(live, "csr.conf")
+            if not path.exists(csr_config):
+                with open(csr_config, "w") as csr:
+                    template = env.get_template("csr.conf.j2")
+                    csr.write(template.render(domain_name=domain_name, domain=domain))
+
             cmd = [
-                "certbot",
-                "certonly",
-                "--webroot",
-                "-w",
-                "/var/www/certbot",
-                "--register-unsafely-without-email",
-                "-d",
-                f"{domain_name},{','.join(domain.sans)}",
-                "--rsa-key-size",
-                "4096",
-                "--agree-tos",
-                "--force-renewal",
-                "--log",
-                "/tmp",
+                "openssl",
+                "req",
+                "-x509",
+                "-nodes",
+                "-days",
+                "3650",
+                "-newkey",
+                "rsa:4096",
+                "-keyout",
+                path.join(live, "privkey.pem"),
+                "-out",
+                path.join(live, "fullchain.pem"),
+                "-config",
+                path.join(live, "csr.conf"),
             ]
             subprocess.run(cmd, check=True)
-
-            # Kill nginx
-            if nginx.poll() is None:
-                nginx.send_signal(signal.SIGTERM)
+        elif "cert" in domain and domain.cert == "own":
+            print("✅ using own certificate for {domain_name}")
+        else:
+            print("✅ requesting certificate from letsencrypt for {domain_name}")
+            with open(SMNRP_NGINX_CONFIG, "w") as config:
+                template = env.get_template("smnrp.conf.j2")
+                config.write(template.render(certrequest=True, domains=cfg.domains))
+            check_nginx_syntax()
+            # Start intermediate nginx
+            nginx = subprocess.Popen(
+                [
+                    "nginx",
+                    "-g",
+                    "daemon off;",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            if nginx.poll() is not None:
+                out, err = nginx.communicate(timeout=1)
+                raise RuntimeError(f"nginx failed to start.\nstdout:\n{out}\nstderr:\n{err}")
             try:
-                nginx.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                nginx.kill()
-                nginx.wait()
-        except subprocess.CalledProcessError:
-            print(f"❌ Cannot request certificate for domain '{domain_name}'")
-            if path.isdir(path.join(LIVE, domain_name)):
-                rmtree(path.join(LIVE, domain_name))
-            exit(3)
+                cmd = [
+                    "certbot",
+                    "certonly",
+                    "--webroot",
+                    "-w",
+                    "/var/www/certbot",
+                    "--register-unsafely-without-email",
+                    "-d",
+                    f"{domain_name},{','.join(domain.sans)}",
+                    "--rsa-key-size",
+                    "4096",
+                    "--agree-tos",
+                    "--force-renewal",
+                    "--log",
+                    "/tmp",
+                ]
+                subprocess.run(cmd, check=True)
+
+                # Kill nginx
+                if nginx.poll() is None:
+                    nginx.send_signal(signal.SIGTERM)
+                try:
+                    nginx.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    nginx.kill()
+                    nginx.wait()
+            except subprocess.CalledProcessError:
+                print(f"❌ Cannot request certificate for domain '{domain_name}'")
+                if path.isdir(path.join(LIVE, domain_name)):
+                    rmtree(path.join(LIVE, domain_name))
+                exit(3)
+
 
 # Create final nginx config and replace entrypoint with nginx
 

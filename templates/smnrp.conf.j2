@@ -24,6 +24,7 @@ server {
   http2 on;
   server_name {{ domain_name }} {{ domain.sans|join(' ') }};
 
+  {% if not domain.disable_https %}
   {% if certrequest %}
   location /.well-known/acme-challenge/ {
     root /var/www/certbot;
@@ -33,9 +34,13 @@ server {
     return 301 https://{{domain_name}}{{':' ~ domain.ports.https if domain.ports and domain.ports.https and domain.ports.https != '443'}}$request_uri;
   }
   {% endif %}
-}
+  {% endif %}
+{% if not domain.disable_https %}
+} {# We do not close the http server to add the configuration in here #}
+{% endif %}
 
 {% if not certrequest %}
+{% if not domain.disable_https %}
 server {
   {% if domain.ports and domain.ports.https %}
   listen {{ domain.ports.https }} ssl;
@@ -69,6 +74,7 @@ server {
   resolver 8.8.8.8 8.8.4.4 valid=300s;
   resolver_timeout 5s;
   {% endif %}
+{% endif %} {# END if not domain.disable_https #}
 
   add_header Strict-Transport-Security "max-age=31536000; includeSubdomains; preload";
 
@@ -98,19 +104,13 @@ server {
 
   {% if domain.client_max_body_size %}
   client_max_body_size {{ domain.client_max_body_size }};
-  {% else %}
-  client_max_body_size 1m;
   {% endif %}
 
   {% if domain.server_tokens %}
   server_tokens {{ domain.server_tokens }};
-  {% else %}
-  server_tokens off;
   {% endif %}
   {% if domain.client_body_buffer_size %}
   client_body_buffer_size {{ domain.client_body_buffer_size }};
-  {% else %}
-  client_body_buffer_size 1k;
   {% endif %}
 
   include /etc/nginx/conf.d/custom/{{ domain_name }}/*.nginx;

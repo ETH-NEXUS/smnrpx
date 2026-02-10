@@ -450,7 +450,7 @@ Here is an example:
       - /path/to/dom.org.key.pem:/etc/letsencrypt/live/dom.org/privkey.pem:ro
 ```
 
-### `SMNRP_CSP`
+### `csp`
 
 You can define the `Content-Security-Policy` header. If this is not defined, none is used. The following example shows the most secure one:
 
@@ -458,9 +458,9 @@ You can define the `Content-Security-Policy` header. If this is not defined, non
 csp: default-src 'self' http: https: data: blob: 'unsafe-inline'
 ```
 
-### `SMNRP_DISABLE_HTTPS`
+### `disable_https`
 
-If set to `true`, SMNRP will completely ignore https for communication and only listen on port 80 to serve the resources.
+If set to `true`, SMNRP*X* will completely ignore https for communication and only listen on port 80 to serve the resources.
 
 ## Configure the listening ports
 
@@ -478,15 +478,15 @@ With the `https` you can configure the **ssl server port** nginx is listening on
 
 ## Apply custom configurations
 
-`SMNRP` also loads `*.nginx` files in the directory `/etc/nginx/conf.d/custom/*.nginx`. You can bind mount or copy a local directory
-including your custom configs to `/etc/nginx/conf.d/custom/`.
+SMNRP*X* also loads `*.nginx` files in the directory `/etc/nginx/conf.d/custom/<domain_name>/*.nginx`. You can bind mount or copy a local directory
+including your custom configs to `/etc/nginx/conf.d/custom/<domain_name>`.
 
 ```yaml
 services:
   ws:
     image: ethnexus/smnrpx
     volumes: ...
-      - ./custom/configs:/etc/nginx/conf.d/custom
+      - ./custom:/etc/nginx/conf.d/custom
 ```
 
 ## Integration into `docker-compose`

@@ -6,6 +6,7 @@ domain:
 
   upstreams: map(list(str()), required=False)
 
+  disable_https: bool(required=False)
   ports: include('ports', required=False)
 
   csp: str(required=False)
