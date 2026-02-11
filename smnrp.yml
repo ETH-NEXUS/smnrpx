@@ -27,6 +27,7 @@ domains:
     ports:
       http: 80
       https: 8443
+      exposed_https: 8443
     upstreams:
       google:
         - google.com:443

@@ -31,7 +31,7 @@ server {
   }
   {% else %}
   location / {
-    return 301 https://{{domain_name}}{{':' ~ domain.ports.https if domain.ports and domain.ports.https and domain.ports.https != '443'}}$request_uri;
+    return 301 https://{{domain_name}}{{':' ~ domain.ports.exposed_https if domain.ports and domain.ports.exposed_https and domain.ports.exposed_https != '443'}}$request_uri;
   }
   {% endif %}
   {% endif %}

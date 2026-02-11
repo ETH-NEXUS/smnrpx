@@ -22,6 +22,7 @@ domain:
 ports:
   http: int(required=False)
   https: int(required=False)
+  exposed_https: int(required=False)
 ---
 location: any(include('proxy_loc'), include('alias_loc'), include('redirect_loc'))
 
