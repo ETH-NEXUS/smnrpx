@@ -1,8 +1,10 @@
 [ req ]
 default_bits = 2048
 default_md = sha256
+{% if domain.sans %}
 req_extensions = req_ext
 x509_extensions = v3_req
+{% endif %}
 distinguished_name = dn
 prompt = no
 
@@ -13,6 +15,7 @@ L = N/A
 O = Self-signed certificate
 CN = {{ domain_name }}
 
+{% if domain.sans %}
 [ req_ext ]
 subjectAltName = @alt_names
 
@@ -26,4 +29,5 @@ subjectAltName = @alt_names
 DNS.{{ dns_cnt }} = {{ san }}
 {% set dns_cnt = dns_cnt + 1%}
 {% endfor %}
+{% endif %}
 {% endif %}

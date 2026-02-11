@@ -186,7 +186,7 @@ def create_dhparams(domain_name: str):
     dhparams_file = path.join(path.sep, "etc", "letsencrypt", f"{domain_name}-dhparams.pem")
     if not path.isfile(dhparams_file):
         print(
-            f"✅ Creating dhparams file for domain '{domain_name}'. This will take a few minutes, be patient."
+            f"⏳ Creating dhparams file for domain '{domain_name}'. This will take a few minutes, be patient 🧘."
         )
         p_dhparam = subprocess.Popen(
             ["openssl", "dhparam", "-out", dhparams_file, "4096"],
