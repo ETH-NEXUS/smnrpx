@@ -314,6 +314,7 @@ for domain_name, domain in cfg.domains.items():
                 subprocess.run(cmd, check=True)
             except subprocess.CalledProcessError:
                 print(f"❌ Cannot create self-signed certificate for domain '{domain_name}'")
+                print("Certificate Signing Request Config:")
                 with open(path.join(live, "csr.conf"), encoding="utf-8") as f:
                     content = f.read()
                 print(content)
