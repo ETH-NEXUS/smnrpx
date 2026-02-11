@@ -291,10 +291,9 @@ for domain_name, domain in cfg.domains.items():
             live = f"{LIVE}/{domain_name}"
             makedirs(live, exist_ok=True)
             csr_config = path.join(live, "csr.conf")
-            if not path.exists(csr_config):
-                with open(csr_config, "w") as csr:
-                    template = env.get_template("csr.conf.j2")
-                    csr.write(template.render(domain_name=domain_name, domain=domain))
+            with open(csr_config, "w") as csr:
+                template = env.get_template("csr.conf.j2")
+                csr.write(template.render(domain_name=domain_name, domain=domain))
             try:
                 cmd = [
                     "openssl",
