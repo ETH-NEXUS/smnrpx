@@ -70,6 +70,7 @@ domains:
     ports:
       http: 80
       https: 8443
+      exposed_https: 8443
     # The Content Security Policy for this domain
     csp: default-src 'self' http: https: data: blob: 'unsafe-inline'
     # Hardening parameters (please read the details below)
@@ -471,10 +472,12 @@ domain:
   ports:
     http: 80
     https: 443
+    exposed_https: 8443
 ```
 
 With the `http` you can configure the **http server port** of nginx. Default is `80`.
 With the `https` you can configure the **ssl server port** nginx is listening on. Default is `443`.
+With the `exposed_https` you can configure the **exposed ssl server port** SMNRP*X* is listening on. Default is `443`.
 
 ## Apply custom configurations
 
