@@ -23,11 +23,9 @@ subjectAltName = @alt_names
 subjectAltName = @alt_names
 
 [ alt_names ]
-{% if domain.sans %}
 {% set dns_cnt = 1 %}
 {% for san in domain.sans %}
 DNS.{{ dns_cnt }} = {{ san }}
 {% set dns_cnt = dns_cnt + 1%}
 {% endfor %}
-{% endif %}
 {% endif %}
