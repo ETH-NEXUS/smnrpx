@@ -287,7 +287,7 @@ for domain_name, domain in cfg.domains.items():
         # Generate self-signed certificates if needed
     else:
         if "cert" in domain and domain.cert == "self-signed":
-            print(f"✅ using self-signed certificate for {domain_name}")
+            print(f"✅ using self-signed certificate for domain '{domain_name}'")
             live = f"{LIVE}/{domain_name}"
             makedirs(live, exist_ok=True)
             csr_config = path.join(live, "csr.conf")
@@ -295,28 +295,34 @@ for domain_name, domain in cfg.domains.items():
                 with open(csr_config, "w") as csr:
                     template = env.get_template("csr.conf.j2")
                     csr.write(template.render(domain_name=domain_name, domain=domain))
-
-            cmd = [
-                "openssl",
-                "req",
-                "-x509",
-                "-nodes",
-                "-days",
-                "3650",
-                "-newkey",
-                "rsa:4096",
-                "-keyout",
-                path.join(live, "privkey.pem"),
-                "-out",
-                path.join(live, "fullchain.pem"),
-                "-config",
-                path.join(live, "csr.conf"),
-            ]
-            subprocess.run(cmd, check=True)
+            try:
+                cmd = [
+                    "openssl",
+                    "req",
+                    "-x509",
+                    "-nodes",
+                    "-days",
+                    "3650",
+                    "-newkey",
+                    "rsa:4096",
+                    "-keyout",
+                    path.join(live, "privkey.pem"),
+                    "-out",
+                    path.join(live, "fullchain.pem"),
+                    "-config",
+                    path.join(live, "csr.conf"),
+                ]
+                subprocess.run(cmd, check=True)
+            except subprocess.CalledProcessError:
+                print(f"❌ Cannot create self-signed certificate for domain '{domain_name}'")
+                with open(path.join(live, "csr.conf"), encoding="utf-8") as f:
+                    content = f.read()
+                print(content)
+                exit(7)
         elif "cert" in domain and domain.cert == "own":
-            print("✅ using own certificate for {domain_name}")
+            print("✅ using own certificate for domain '{domain_name}'")
         else:
-            print(f"✅ requesting certificate from letsencrypt for '{domain_name}'")
+            print(f"✅ requesting certificate from letsencrypt for domain '{domain_name}'")
             with open(SMNRP_NGINX_CONFIG, "w") as config:
                 template = env.get_template("smnrp.conf.j2")
                 config.write(template.render(certrequest=True, domains=cfg.domains))

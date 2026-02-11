@@ -1,8 +1,9 @@
 domains:
   echo.7f000001.nip.io:
-    disable_https: true
-    sans:
-      - www.echo.7f000001.nip.io
+    disable_https: false
+    cert: "self-signed"
+    # sans:
+    #   - www.echo.7f000001.nip.io
     upstreams:
       api:
         - echo:80
