@@ -1,3 +1,8 @@
+configs:
+  smnrp:
+    file: ./smnrp.yml
+volumes:
+  smnrp_data:
 services:
   ws:
     build: .
@@ -5,6 +10,8 @@ services:
       - "80:80"
       - "443:443"
       - "8443:8443"
+    volumes:
+      - smnrp_data:/etc/letsencrypt
     configs:
       - source: smnrp
         target: /run/configs/smnrp.yml
@@ -14,6 +21,3 @@ services:
     image: kennethreitz/httpbin
     environment:
       TZ: "Europe/Zurich"
-configs:
-  smnrp:
-    file: ./smnrp.yml
