@@ -1,0 +1,51 @@
+{
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.validate": ["json", "yaml"],
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "always"
+    }
+  },
+  "ruff.configuration": "pyproject.toml",
+  "ruff.nativeServer": "on",
+  "ruff.codeAction.disableRuleComment": {
+    "enable": false
+  },
+  "[pyproject-toml]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "tamasfe.even-better-toml",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    }
+  },
+  "[jinja-nginx]": {
+    "editor.defaultFormatter": "monosans.djlint",
+    "editor.formatOnSave": true
+  },
+  "cSpell.words": [
+    "certbot",
+    "certrequest",
+    "dhparams",
+    "endfor",
+    "errorpages",
+    "fullchain",
+    "keepalive",
+    "letsencrypt",
+    "ocsp",
+    "privkey",
+    "pyyaml",
+    "selfsigned",
+    "SMNRP",
+    "smnrpx",
+    "waitpid"
+  ]
+}
