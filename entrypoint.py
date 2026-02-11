@@ -316,7 +316,7 @@ for domain_name, domain in cfg.domains.items():
         elif "cert" in domain and domain.cert == "own":
             print("✅ using own certificate for {domain_name}")
         else:
-            print("✅ requesting certificate from letsencrypt for {domain_name}")
+            print(f"✅ requesting certificate from letsencrypt for '{domain_name}'")
             with open(SMNRP_NGINX_CONFIG, "w") as config:
                 template = env.get_template("smnrp.conf.j2")
                 config.write(template.render(certrequest=True, domains=cfg.domains))
