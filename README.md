@@ -7,18 +7,51 @@ The _Secure Multifuctional Nginx Reverse Proxy eXtended version (SMNRP)_ is a re
 ## Migration
 
 To migrate from smnrp to smnrpx you basically need to convert the environment variables to a yaml file. The mapping should be straight forward.
-The functionality stays the same except:
+The functionality stays the same, except:
 
 - bypass is no longer supported as a certificate provider
 - analytics is no longer supported
+
+### Migration example
+
+```bash
+SMNRP_DOMAINS=dom.org,www.dom.org
+SMNRP_UPSTREAMS=api!api:5000
+SMNRP_LOCATIONS=/api/!http://api/api/,/static/!/vol/web/static!t,/goto/!https://dom2.org!r
+```
+
+is migrated to
+
+```yaml
+domains:
+  dom.org:
+    sans:
+      - www.dom.org
+    upstreams:
+      api:
+        - api:5000
+    locations:
+      - proxy:
+          uri: /api/
+          proto: http
+          upstream: api
+          path: /api/
+      - alias:
+          uri: /static/
+          path: /vol/web/static
+          try_files: true
+      - redirect:
+          uri: /goto/
+          url: https://dom2.org
+```
 
 ## Features
 
 ### HTTPS Certificates
 
 - Automatic generation and renewal of https certificates (using [Let's Encrypt](https://letsencrypt.org/)
-- Automatic generation of a self signed certificate
-- Usage of custom (own) certificates
+- Automatic generation of a `self-signed` certificate
+- Usage of custom (`own`) certificates
 
 ### Usage options
 
@@ -160,14 +193,14 @@ domains:
     api:
       - api:5000
   locations:
-    proxy:
-      uri: /api/
-      proto: http
-      upstream: api
-      path: /api/
-    alias:
-      uri: /api/static
-      path: /usr/share/static
+    - proxy:
+        uri: /api/
+        proto: http
+        upstream: api
+        path: /api/
+    - alias:
+        uri: /api/static
+        path: /vol/web/static
 ```
 
 In this example the domain `dom.org` is configured.
@@ -177,7 +210,8 @@ The domain names under `sans` are additional domain names for the same domain an
 The upstream `api` points to the host `api` and port `5000`. This is often a container service name where the web applications REST API is running, but can be
 any `hostname:port` combination reachable from smnrp.
 
-There are different location types. In this case we use a `proxy` location to proxy the requests to the api service and an `alias` location to
+There are different location types. In this case we use a `proxy` location to proxy the requests to a service running in a different container or even a different
+host and an `alias` location to
 configure an alias for local path. The `proxy` location defines what `uri` is proxied to what `proto`, what `upstream` and what `path`. The `alias` location
 defines what `uri` is aliased by what local `path`.
 
@@ -235,10 +269,10 @@ Each domain becomes a virtual host in SMNRP*X*. Just configure multiple `domains
 ### `domains`
 
 Each domain has a name (`domain_name`), the _common name (cn)_ and optionally `sans`, the _Subject Alternative Names_.
-The default root folder for each domain is located at `/web_root/domain_name`.
-A domain contains differents `upstreams`, `locations` and additional configuration parameters:
+The default root folder for each domain is located at `/web_root/<domain_name>`.
+A domain contains different `upstreams`, `locations` and additional configuration parameters:
 
-- `cert`: Can have the values 'self-signed' or 'own' or not defined to define how the certificate is generated. Default is through Let's Encrypt.
+- `cert`: Can have the values `self-signed` or `own` or not defined, to define how the certificate is generated. Default is through Let's Encrypt.
 - `csp`: The Content security policy. Default is the nginx default.
 - `proxy_buffer_size`: The proxy buffer size.
 - `client_max_body_size`: The client max body size.
@@ -287,7 +321,7 @@ locations:
 The `alias` location is to serve files from a defined local path. For example if you have static files in the local path `/usr/local/static` that
 you want to serve if the uri `/api/static` is requested. There are additional configuration settings you can add:
 
-- `internal`: true or false, adds the `internal` clause to an alias location. This can be used to protect the file in this location from public access. Such files are only accessible by setting the `X-Accel-Redirect` header
+- `internal`: true or false, adds the `internal` clause to an alias location. This can be used to protect the file in this location from public access. Such files are only accessible by setting the `X-Accel-Redirect` header.
 - `try_files`: adds a `try_files` clause to the `alias` location.
 - `auth`: same as in the `proxy` location
 
@@ -305,7 +339,7 @@ locations:
 
 #### `redirect` location
 
-The redirect location is used to redirect a location to another one returning a 301 HTTP status code (_permanent redirect_). For example if you want to
+The redirect location is used to redirect a location to another one, returning a 301 HTTP status code (_permanent redirect_). For example if you want to
 redirect the uri `/redir` to the url `https://google.com`. There are no additional configuration parameters available.
 
 ```yaml
@@ -359,7 +393,7 @@ location <path> {
 }
 ```
 
-- for a `proxy_url`:
+- for a `proxy`:
 
 ```nginx
 location <path> {
@@ -428,7 +462,7 @@ location /api/ {
 }
 ```
 
-> Hint: Please be aware that the SMNRP default proxy config is included in the location BEFORE the custom configs.
+> Hint: Please be aware that the SMNRP*X* default proxy config is included in the location BEFORE the custom configs.
 > If `disable_default_headers` is set to `false` no default headers are added to the location block.
 
 ### cert
@@ -461,7 +495,7 @@ csp: default-src 'self' http: https: data: blob: 'unsafe-inline'
 
 ### `disable_https`
 
-If set to `true`, SMNRP*X* will completely ignore https for communication and only listen on port 80 to serve the resources.
+If set to `true`, SMNRP*X* will completely ignore https for communication and only listen on the http port to serve the resources.
 
 ## Configure the listening ports
 
@@ -539,7 +573,7 @@ If you are using a local directory to bind mount `/etc/letsencrypt` (i.e. `smnrp
 
 ### Integration into `docker-compose` while chaining SMNRP*X* instances
 
-In case you want to chain SMNRP`_X_ instances on the same host you need to configure the
+In case you want to chain SMNRP*X* instances on the same host you need to configure the
 
 - `network_mode` to `host` and
 - omit the `ports` configuration.
@@ -601,33 +635,6 @@ volumes:
   - ./my-auth_required.html:/usr/share/nginx/html/error/auth_required.html
 ```
 
-## Detect and handle certificate renewals on host
-
-`SMNRP` is adding a file called like the domain for which the certificate update happened into the directory `/signal`. You can bind mount this directory and run a cronjob on your host os to detect changes. This can be essential, for example if you want to restart a mail server after the Let's Encrypt certificate has been renewed. An example script could look like this:
-
-```bash
-#!/usr/bin/env bash
-
-SIGNAL_DIR="/path/to/signal"
-DOMAIN="domain.of.interest"
-
-if [ -f "${SIGNAL_DIR}/${DOMAIN}" ]; then
-    echo "##############"
-    echo `date`
-    rm -f "${SIGNAL_DIR}/${DOMAIN}"
-    ### EXAMPLE to reload postfix
-    postfix reload
-    service dovecot reload
-    ### you can add your own logic here
-fi
-```
-
-The following entry can be added to the repository's owners crontab:
-
-```crontab
-* * * * * (sudo /path/to/scripts/certRenew.sh 2>&1) >> /path/to/logs/certRenew.log
-```
-
 ## Reset smnrp
 
 If you went into troubles because of too many different configuration changes, you may want to reset smnrp:
@@ -637,7 +644,7 @@ docker exec <smnrp-container> /smnrp_reset
 docker restart <smnrp-container>
 ```
 
-This will basically remove already downloaded certificates and forces `SMNRP` to request a new certificate after the container restart.
+This will basically remove already downloaded certificates and forces SMNRP*X* to request a new certificate after the container restart.
 
 ## Configure hardening parameters
 
