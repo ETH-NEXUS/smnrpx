@@ -1,7 +1,7 @@
 domains:
   echo.7f000001.nip.io:
     disable_https: false
-    cert: "self-signed"
+    # cert: "self-signed"
     # sans:
     #   - www.echo.7f000001.nip.io
     upstreams:
@@ -21,7 +21,7 @@ domains:
     disable_ocsp_stapling: false
 
   search.7f000001.nip.io:
-    cert: self-signed
+    # cert: self-signed
     sans:
       - www.search.7f000001.nip.io
     ports:

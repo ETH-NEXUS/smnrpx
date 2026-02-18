@@ -4,7 +4,7 @@ import json
 import re
 import signal
 import subprocess
-from os import environ, execvp, fork, makedirs, path, remove
+from os import environ, execvp, fork, makedirs, path, remove, symlink
 from pathlib import Path
 from shutil import copy, rmtree
 from sys import argv, exit
@@ -23,6 +23,9 @@ NGINX_DOT_CONF = path.join("/", "etc", "nginx", "nginx.conf")
 NGINX_CONFIG_BASE = path.join("/", "etc", "nginx", "conf.d")
 SMNRP_NGINX_CONFIG = path.join(NGINX_CONFIG_BASE, "smnrp.conf")
 CERT_RENEW_TIMEOUT = 24 * 60 * 60
+DOMAIN_REGEX = re.compile(r"^(?:(?P<sub>.+)\.)?(?P<main>[^.]+\.[^.]+)$")
+
+
 DEFAULTS = {
     "server_tokens": "off",
     "proxy_buffer_size": "32k",
@@ -209,6 +212,113 @@ def apply_defaults(cfg: Box) -> Box:
     return cfg
 
 
+def get_grouped_domains(cfg: Box):
+    # Go through the domains and collect all main-domain related sans
+    # to avoid multiple requests per main domain, which will be rejected
+    # by Let's Encrypt
+    lets_encrypt_domain_specs = []
+    grouped_domains = {}
+    for domain_name, domain in cfg.domains.items():
+        if "cert" not in domain:
+            lets_encrypt_domain_specs.append({"domain": domain_name, "type": "vhost"})
+            if "sans" in domain:
+                for san in domain.sans:
+                    lets_encrypt_domain_specs.append({"domain": san, "type": "san"})
+
+    for domain_spec in lets_encrypt_domain_specs:
+        match = DOMAIN_REGEX.match(domain_spec["domain"])
+        if not match:
+            print(f"⚠️ '{domain_spec['domain']}' is not a correct domain name, ignoring")
+            continue
+
+        main = match.group("main")
+        sub = match.group("sub")
+
+        if main not in grouped_domains:
+            grouped_domains[main] = []
+
+        if sub:
+            grouped_domains[main].append(domain_spec)
+
+    return grouped_domains
+
+
+def prepare_nginx_for_cert_request(cfg: Box):
+    with open(SMNRP_NGINX_CONFIG, "w") as config:
+        template = env.get_template("smnrp.conf.j2")
+        config.write(template.render(certrequest=True, domains=cfg.domains))
+    check_nginx_syntax()
+    # Start intermediate nginx
+    nginx = subprocess.Popen(
+        [
+            "nginx",
+            "-g",
+            "daemon off;",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if nginx.poll() is not None:
+        out, err = nginx.communicate(timeout=1)
+        raise RuntimeError(f"nginx failed to start.\nstdout:\n{out}\nstderr:\n{err}")
+    return nginx
+
+
+def kill_nginx(nginx):
+    # Kill nginx
+    if nginx.poll() is None:
+        nginx.send_signal(signal.SIGTERM)
+    try:
+        nginx.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        nginx.kill()
+        nginx.wait()
+
+
+def handle_lets_encrypt_request(grouped_domains: dict):
+    for _, domain_specs in grouped_domains.items():
+        for domain_spec in domain_specs:
+            # find the first vhost
+            if domain_spec["type"] == "vhost":
+                vhost = domain_spec["domain"]
+                sans = [
+                    domain_spec["domain"]
+                    for domain_spec in domain_specs
+                    if domain_spec["domain"] != vhost
+                ]
+                break
+        print(f"✅ requesting certificate from letsencrypt for domain '{vhost}'")
+        try:
+            cmd = [
+                "certbot",
+                "certonly",
+                "--webroot",
+                "-w",
+                "/var/www/certbot",
+                "--register-unsafely-without-email",
+                "-d",
+                f"{vhost},{','.join(sans)}",
+                "--rsa-key-size",
+                "4096",
+                "--agree-tos",
+                "--force-renewal",
+                "--log",
+                "/tmp",
+            ]
+            subprocess.run(cmd, check=True)
+            # if certificate was requested create sym links for the other vhosts
+            for domain_spec in domain_specs:
+                if domain_spec["type"] == "vhost" and domain_spec["domain"] != vhost:
+                    if path.isdir(path.join(LIVE, vhost)):
+                        symlink(path.join(LIVE, domain_spec[domain]), path.join(LIVE, vhost))
+        except subprocess.CalledProcessError:
+            print(f"❌ Cannot request certificate for domain '{vhost}'")
+            if path.isdir(path.join(LIVE, vhost)):
+                rmtree(path.join(LIVE, vhost))
+            exit(3)
+
+
 # END helper functions
 
 print("🚀 Start SMNRP 🚀")
@@ -236,6 +346,10 @@ env = Environment(loader=FileSystemLoader("templates"), trim_blocks=True, lstrip
 # Remove default nginx config
 if path.isfile(path.join(NGINX_CONFIG_BASE, "default.conf")):
     remove(path.join(NGINX_CONFIG_BASE, "default.conf"))
+
+nginx = prepare_nginx_for_cert_request(cfg)
+handle_lets_encrypt_request(get_grouped_domains(cfg))
+kill_nginx(nginx)
 
 for domain_name, domain in cfg.domains.items():
     # Copy over default files
@@ -322,58 +436,6 @@ for domain_name, domain in cfg.domains.items():
                 exit(7)
         elif "cert" in domain and domain.cert == "own":
             print("✅ using own certificate for domain '{domain_name}'")
-        else:
-            print(f"✅ requesting certificate from letsencrypt for domain '{domain_name}'")
-            with open(SMNRP_NGINX_CONFIG, "w") as config:
-                template = env.get_template("smnrp.conf.j2")
-                config.write(template.render(certrequest=True, domains=cfg.domains))
-            check_nginx_syntax()
-            # Start intermediate nginx
-            nginx = subprocess.Popen(
-                [
-                    "nginx",
-                    "-g",
-                    "daemon off;",
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            if nginx.poll() is not None:
-                out, err = nginx.communicate(timeout=1)
-                raise RuntimeError(f"nginx failed to start.\nstdout:\n{out}\nstderr:\n{err}")
-            try:
-                cmd = [
-                    "certbot",
-                    "certonly",
-                    "--webroot",
-                    "-w",
-                    "/var/www/certbot",
-                    "--register-unsafely-without-email",
-                    "-d",
-                    f"{domain_name},{','.join(domain.sans)}",
-                    "--rsa-key-size",
-                    "4096",
-                    "--agree-tos",
-                    "--force-renewal",
-                    "--log",
-                    "/tmp",
-                ]
-                subprocess.run(cmd, check=True)
-
-                # Kill nginx
-                if nginx.poll() is None:
-                    nginx.send_signal(signal.SIGTERM)
-                try:
-                    nginx.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    nginx.kill()
-                    nginx.wait()
-            except subprocess.CalledProcessError:
-                print(f"❌ Cannot request certificate for domain '{domain_name}'")
-                if path.isdir(path.join(LIVE, domain_name)):
-                    rmtree(path.join(LIVE, domain_name))
-                exit(3)
 
 
 # Create final nginx config and replace entrypoint with nginx
