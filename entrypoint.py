@@ -7,7 +7,7 @@ import subprocess
 from os import environ, execvp, fork, makedirs, path, remove
 from pathlib import Path
 from shutil import copy, rmtree
-from sys import exit
+from sys import argv, exit
 from time import sleep
 
 import yamale
@@ -19,6 +19,7 @@ from yamale.yamale_error import YamaleError
 LIVE = path.join("/", "etc", "letsencrypt", "live")
 DOMAIN_HASHES = path.join(LIVE, "domain_hashes.json")
 SMNRP_CONFIG = path.join(path.sep, "run", "configs", "smnrp.yml")
+NGINX_DOT_CONF = path.join("/", "etc", "nginx", "nginx.conf")
 NGINX_CONFIG_BASE = path.join("/", "etc", "nginx", "conf.d")
 SMNRP_NGINX_CONFIG = path.join(NGINX_CONFIG_BASE, "smnrp.conf")
 CERT_RENEW_TIMEOUT = 24 * 60 * 60
@@ -376,7 +377,9 @@ for domain_name, domain in cfg.domains.items():
 
 
 # Create final nginx config and replace entrypoint with nginx
-
+with open(NGINX_DOT_CONF, "w") as config:
+    template = env.get_template("nginx.conf.j2")
+    config.write(template.render(modules=cfg.get("modules", {})))
 with open(SMNRP_NGINX_CONFIG, "w") as config:
     template = env.get_template("smnrp.conf.j2")
     config.write(template.render(certrequest=False, domains=cfg.domains))
@@ -389,6 +392,12 @@ if pid == 0:
     cert_renew()
 else:
     # this becomes the new PID 0
+    args = argv[1:]
+    print(f"args are {args}")
+    if args:
+        print(f"🙌 Executing {' '.join(args)}...")
+        execvp(args[0], args)
+    # else in the default case run nginx as the main process
     print("🙌 Starting nginx...")
     execvp(
         "nginx",
