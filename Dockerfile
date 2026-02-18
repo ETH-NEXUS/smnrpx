@@ -45,10 +45,6 @@ RUN mkdir -p /var/www/certbot
 # Create letsencrypt directory
 RUN mkdir -p /etc/letsencrypt
 
-# Copy the nginx configurtion files
-COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
-# COPY ./nginx/conf.d /etc/nginx/conf.d
-
 # Copy the errorpages
 RUN mkdir -p /usr/share/nginx/html/error
 COPY ./nginx/errorpages/* /usr/share/nginx/html/error/.
@@ -70,6 +66,7 @@ COPY ./entrypoint.py /entrypoint.py
 COPY ./smnrp_reset /smnrp_reset
 COPY ./templates /templates
 COPY ./smnrp_schema.yml /smnrp_schema.yml
+RUN touch /etc/nginx/nginx.conf
 RUN chmod 755 /entrypoint.py /smnrp_reset
 
 # let the smnrp user own the needed files and dirs
@@ -77,6 +74,7 @@ RUN chown -R smnrp:smnrp \
   /entrypoint.py \
   /smnrp_reset \
   /etc/nginx/conf.d \
+  /etc/nginx/nginx.conf \
   /var/cache/nginx \
   /var/lib/letsencrypt \
   /var/www \
