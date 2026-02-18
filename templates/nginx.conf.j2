@@ -1,4 +1,9 @@
-# user  nginx;
+{% if modules %}
+{% for module in modules %}
+load_module modules/{{module}}_module.so;
+{% endfor %}
+{% endif %}
+
 worker_processes  auto;
 
 error_log  /dev/stderr debug;

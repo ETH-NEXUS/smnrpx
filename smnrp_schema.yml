@@ -1,4 +1,5 @@
 domains: map(include('domain'), required=True)
+modules: include('module', required=False)
 ---
 domain:
   cert: enum('self-signed', 'own', required=False)
@@ -40,6 +41,7 @@ proxy:
   custom: list(str(), required=False)
   disable_cache: bool(required=False)
   disable_default_headers: bool(required=False)
+  ensure_token: bool(required=False)
 ---
 alias_loc:
   alias: include('alias')
@@ -66,3 +68,6 @@ auth: list(include('user_pass'), required=True)
 user_pass:
   user: str(required=True)
   password: str(required=True)
+---
+module:
+  some_potential_module: bool(required=False)
