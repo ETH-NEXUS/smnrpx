@@ -38,6 +38,7 @@
     "endfor",
     "errorpages",
     "fullchain",
+    "inotify",
     "keepalive",
     "letsencrypt",
     "ocsp",
@@ -46,7 +47,10 @@
     "selfsigned",
     "SMNRP",
     "smnrpx",
+    "tempmail",
+    "tmpmail",
     "vhost",
-    "waitpid"
+    "waitpid",
+    "xclip"
   ]
 }

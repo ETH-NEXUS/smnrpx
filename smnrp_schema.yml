@@ -2,7 +2,7 @@ domains: map(include('domain'), required=True)
 modules: include('module', required=False)
 ---
 domain:
-  cert: enum('self-signed', 'own', required=False)
+  cert: enum('self-signed', 'own', 'letsencrypt', required=False)
   sans: list(str(), required=False)
 
   upstreams: map(list(str()), required=False)

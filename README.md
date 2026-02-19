@@ -272,7 +272,7 @@ Each domain has a name (`domain_name`), the _common name (cn)_ and optionally `s
 The default root folder for each domain is located at `/web_root/<domain_name>`.
 A domain contains different `upstreams`, `locations` and additional configuration parameters:
 
-- `cert`: Can have the values `self-signed` or `own` or not defined, to define how the certificate is generated. Default is through Let's Encrypt.
+- `cert`: Can have the values `self-signed`, `own`, `letsencrypt` or not defined, to define how the certificate is generated. Default is through Let's Encrypt.
 - `csp`: The Content security policy. Default is the nginx default.
 - `proxy_buffer_size`: The proxy buffer size.
 - `client_max_body_size`: The client max body size.

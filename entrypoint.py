@@ -24,6 +24,7 @@ NGINX_CONFIG_BASE = path.join("/", "etc", "nginx", "conf.d")
 SMNRP_NGINX_CONFIG = path.join(NGINX_CONFIG_BASE, "smnrp.conf")
 CERT_RENEW_TIMEOUT = 24 * 60 * 60
 DOMAIN_REGEX = re.compile(r"^(?:(?P<sub>.+)\.)?(?P<main>[^.]+\.[^.]+)$")
+ENV_VAR_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
 
 DEFAULTS = {
@@ -131,31 +132,18 @@ def check_nginx_syntax():
         print("✅ nginx configuration is ok")
 
 
-def check_smnrp_config():
-    if not path.isfile(SMNRP_CONFIG):
-        print("❌ SMNRP config is missing")
-        print("👉 Please configure the config in docker-compose.yml:")
-        print("configs:")
-        print("  smnrp:")
-        print("    file: ./smnrp.yml")
-        print("services:")
-        print("  ws:")
-        print("    configs:")
-        print("      - source: smnrp")
-        print(f"        target: {SMNRP_CONFIG}")
-        exit(1)
-    else:
-        try:
-            schema = yamale.make_schema("/smnrp_schema.yml")
-            config = yamale.make_data(SMNRP_CONFIG)
-            yamale.validate(schema, config)
-            print("✅ SMNRP configuration is valid")
-        except YamaleError as e:
-            print("❌ SMNRP configuration validation failed, findings:")
-            for result in e.results:
-                for error in result.errors:
-                    print("-", error)
-            exit(4)
+def check_smnrp_config(config):
+    try:
+        schema = yamale.make_schema("/smnrp_schema.yml")
+        config = yamale.make_data(content=yaml.safe_dump(config))
+        yamale.validate(schema, config)
+        print("✅ SMNRP configuration is valid")
+    except YamaleError as e:
+        print("❌ SMNRP configuration validation failed, findings:")
+        for result in e.results:
+            for error in result.errors:
+                print("-", error)
+        exit(4)
 
 
 def cert_renew():
@@ -216,16 +204,16 @@ def get_grouped_domains(cfg: Box):
     # Go through the domains and collect all main-domain related sans
     # to avoid multiple requests per main domain, which will be rejected
     # by Let's Encrypt
-    lets_encrypt_domain_specs = []
+    cert_domain_specs = []
     grouped_domains = {}
     for domain_name, domain in cfg.domains.items():
-        if "cert" not in domain:
-            lets_encrypt_domain_specs.append({"domain": domain_name, "type": "vhost"})
+        if "cert" not in domain or domain.cert == "letsencrypt":
+            cert_domain_specs.append({"domain": domain_name, "type": "vhost"})
             if "sans" in domain:
                 for san in domain.sans:
-                    lets_encrypt_domain_specs.append({"domain": san, "type": "san"})
+                    cert_domain_specs.append({"domain": san, "type": "san"})
 
-    for domain_spec in lets_encrypt_domain_specs:
+    for domain_spec in cert_domain_specs:
         match = DOMAIN_REGEX.match(domain_spec["domain"])
         if not match:
             print(f"⚠️ '{domain_spec['domain']}' is not a correct domain name, ignoring")
@@ -276,7 +264,7 @@ def kill_nginx(nginx):
         nginx.wait()
 
 
-def handle_lets_encrypt_request(grouped_domains: dict):
+def handle_cert_request(grouped_domains: dict):
     for _, domain_specs in grouped_domains.items():
         for domain_spec in domain_specs:
             # find the first vhost
@@ -312,11 +300,22 @@ def handle_lets_encrypt_request(grouped_domains: dict):
                 if domain_spec["type"] == "vhost" and domain_spec["domain"] != vhost:
                     if path.isdir(path.join(LIVE, vhost)):
                         symlink(path.join(LIVE, domain_spec[domain]), path.join(LIVE, vhost))
-        except subprocess.CalledProcessError:
+        except subprocess.CalledProcessError as err:
             print(f"❌ Cannot request certificate for domain '{vhost}'")
+            print(err)
             if path.isdir(path.join(LIVE, vhost)):
                 rmtree(path.join(LIVE, vhost))
             exit(3)
+
+
+def expand_env_vars(value):
+    if isinstance(value, str):
+        return ENV_VAR_PATTERN.sub(lambda m: environ.get(m.group(1), m.group(0)), value)
+    elif isinstance(value, dict):
+        return {k: expand_env_vars(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [expand_env_vars(v) for v in value]
+    return value
 
 
 # END helper functions
@@ -332,10 +331,25 @@ if "SMNRP" in environ:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(env_config, encoding="utf-8")
         print("✅ Take config from environment variable 'SMNRP'")
+else:
+    # Check if config is there
+    if not path.isfile(SMNRP_CONFIG):
+        print("❌ SMNRP config is missing")
+        print("👉 Please configure the config in docker-compose.yml:")
+        print("configs:")
+        print("  smnrp:")
+        print("    file: ./smnrp.yml")
+        print("services:")
+        print("  ws:")
+        print("    configs:")
+        print("      - source: smnrp")
+        print(f"        target: {SMNRP_CONFIG}")
+        exit(1)
 
-check_smnrp_config()
-with open(SMNRP_CONFIG) as config:
-    cfg = Box(yaml.safe_load(config))
+with open(SMNRP_CONFIG) as config_file:
+    config = expand_env_vars(yaml.safe_load(config_file))
+    check_smnrp_config(config)
+    cfg = Box(config)
 
 # Apply config defaults to be most secure
 cfg = apply_defaults(cfg)
@@ -348,7 +362,7 @@ if path.isfile(path.join(NGINX_CONFIG_BASE, "default.conf")):
     remove(path.join(NGINX_CONFIG_BASE, "default.conf"))
 
 nginx = prepare_nginx_for_cert_request(cfg)
-handle_lets_encrypt_request(get_grouped_domains(cfg))
+handle_cert_request(get_grouped_domains(cfg))
 kill_nginx(nginx)
 
 for domain_name, domain in cfg.domains.items():
