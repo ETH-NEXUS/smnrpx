@@ -299,7 +299,7 @@ def handle_cert_request(grouped_domains: dict):
             for domain_spec in domain_specs:
                 if domain_spec["type"] == "vhost" and domain_spec["domain"] != vhost:
                     if path.isdir(path.join(LIVE, vhost)):
-                        symlink(path.join(LIVE, domain_spec[domain]), path.join(LIVE, vhost))
+                        symlink(path.join(LIVE, domain_spec["domain"]), path.join(LIVE, vhost))
         except subprocess.CalledProcessError as err:
             print(f"❌ Cannot request certificate for domain '{vhost}'")
             print(err)
