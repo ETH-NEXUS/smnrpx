@@ -221,13 +221,11 @@ def get_grouped_domains(cfg: Box):
             continue
 
         main = match.group("main")
-        sub = match.group("sub")
 
         if main not in grouped_domains:
             grouped_domains[main] = []
 
-        if sub:
-            grouped_domains[main].append(domain_spec)
+        grouped_domains[main].append(domain_spec)
 
     return grouped_domains
 
