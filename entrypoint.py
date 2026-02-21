@@ -175,12 +175,10 @@ def cert_renew():
             print("❌ Certificate renewal failed.")
 
 
-def create_dhparams(domain_name: str):
-    dhparams_file = path.join(path.sep, "etc", "letsencrypt", f"{domain_name}-dhparams.pem")
+def create_dhparams():
+    dhparams_file = path.join(path.sep, "etc", "letsencrypt", "dhparams.pem")
     if not path.isfile(dhparams_file):
-        print(
-            f"⏳ Creating dhparams file for domain '{domain_name}'. This will take a few minutes, be patient 🧘."
-        )
+        print("⏳ Creating dhparams file. This will take a few minutes, be patient 🧘.")
         p_dhparam = subprocess.Popen(
             ["openssl", "dhparam", "-out", dhparams_file, "4096"],
             stdout=subprocess.PIPE,
@@ -190,7 +188,7 @@ def create_dhparams(domain_name: str):
 
         if p_dhparam.wait() != 0:
             out, err = p_dhparam.communicate(timeout=1)
-            print(f"❌ Could not create dhparams file for '{domain_name}': {out}\n{err}")
+            print(f"❌ Could not create dhparams file: {out}\n{err}")
             exit(6)
 
 
@@ -361,6 +359,8 @@ env = Environment(loader=FileSystemLoader("templates"), trim_blocks=True, lstrip
 if path.isfile(path.join(NGINX_CONFIG_BASE, "default.conf")):
     remove(path.join(NGINX_CONFIG_BASE, "default.conf"))
 
+create_dhparams()
+
 nginx = prepare_nginx_for_cert_request(cfg)
 handle_cert_request(get_grouped_domains(cfg))
 kill_nginx(nginx)
@@ -370,7 +370,6 @@ for domain_name, domain in cfg.domains.items():
     populate_if_not_exists(domain_name, "index.html")
     populate_if_not_exists(domain_name, "favicon.ico")
     populate_if_not_exists(domain_name, "background.jpg")
-    create_dhparams(domain_name)
 
     # Prepare authentication
     if "locations" in domain:
