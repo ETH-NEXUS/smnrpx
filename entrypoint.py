@@ -468,7 +468,6 @@ if pid == 0:
 else:
     # this becomes the new PID 0
     args = argv[1:]
-    print(f"args are {args}")
     if args:
         print(f"🙌 Executing {' '.join(args)}...")
         execvp(args[0], args)
