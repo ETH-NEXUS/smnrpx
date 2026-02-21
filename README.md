@@ -513,6 +513,25 @@ With the `http` you can configure the **http server port** of nginx. Default is 
 With the `https` you can configure the **ssl server port** nginx is listening on. Default is `443`.
 With the `exposed_https` you can configure the **exposed ssl server port** SMNRP*X* is listening on. Default is `443`.
 
+## Configure SMNRP*X* using environment variables
+
+You can add `${env-var}` in the config to replace certain values with environment variables.
+
+```yaml
+domains:
+  7f000001.nip.io:
+    cert: ${SMNRP_CERT}
+  ...
+```
+
+in the `.env` file you can now define
+
+```.env
+SMNRP_CERT=self-signed
+```
+
+to replace the `${SMNRP_CERT}` in the config.
+
 ## Apply custom configurations
 
 SMNRP*X* also loads `*.nginx` files in the directory `/etc/nginx/conf.d/custom/<domain_name>/*.nginx`. You can bind mount or copy a local directory
