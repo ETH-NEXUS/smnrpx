@@ -297,7 +297,7 @@ def handle_cert_request(grouped_domains: dict):
                 if domain_spec["type"] == "vhost" and domain_spec["domain"] != vhost:
                     if path.isdir(path.join(LIVE, vhost)):
                         with contextlib.suppress(FileExistsError):
-                            symlink(path.join(LIVE, domain_spec["domain"]), path.join(LIVE, vhost))
+                            symlink(path.join(LIVE, vhost), path.join(LIVE, domain_spec["domain"]))
         except subprocess.CalledProcessError as err:
             print(f"❌ Cannot request certificate for domain '{vhost}'")
             print(err)
