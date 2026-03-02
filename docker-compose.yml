@@ -18,7 +18,7 @@ services:
       - source: smnrp
         target: /run/configs/smnrp.yml
     env_file: .env
-    network_mode: host
+    # network_mode: host
   echo:
     platform: linux/amd64
     image: kennethreitz/httpbin

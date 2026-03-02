@@ -223,12 +223,13 @@ def get_grouped_domains(cfg: Box):
             print(f"⚠️ '{domain_spec['domain']}' is not a correct domain name, ignoring")
             continue
 
-        main = match.group("main")
+        if domain_spec["type"] == "vhost":
+            vhost = domain_spec["domain"]
 
-        if main not in grouped_domains:
-            grouped_domains[main] = []
+        if vhost not in grouped_domains:
+            grouped_domains[vhost] = []
 
-        grouped_domains[main].append(domain_spec)
+        grouped_domains[vhost].append(domain_spec)
 
     return grouped_domains
 
