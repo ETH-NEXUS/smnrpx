@@ -224,12 +224,12 @@ def get_grouped_domains(cfg: Box):
             continue
 
         if domain_spec["type"] == "vhost":
-            vhost = domain_spec["domain"]
+            main = match.group("main")
 
-        if vhost not in grouped_domains:
-            grouped_domains[vhost] = []
+        if main not in grouped_domains:
+            grouped_domains[main] = []
 
-        grouped_domains[vhost].append(domain_spec)
+        grouped_domains[main].append(domain_spec)
 
     return grouped_domains
 
@@ -371,6 +371,8 @@ create_dhparams(False)
 with open(NGINX_DOT_CONF, "w") as config:
     template = env.get_template("nginx.conf.j2")
     config.write(template.render(modules=cfg.get("modules", None)))
+
+print(get_grouped_domains(cfg))
 
 nginx = prepare_nginx_for_cert_request(cfg)
 handle_cert_request(get_grouped_domains(cfg))
