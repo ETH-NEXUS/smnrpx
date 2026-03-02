@@ -175,21 +175,26 @@ def cert_renew():
             print("❌ Certificate renewal failed.")
 
 
-def create_dhparams():
+def create_dhparams(create: bool = True):
     dhparams_file = path.join(path.sep, "etc", "letsencrypt", "dhparams.pem")
     if not path.isfile(dhparams_file):
-        print("⏳ Creating dhparams file. This will take a few minutes, be patient 🧘.")
-        p_dhparam = subprocess.Popen(
-            ["openssl", "dhparam", "-out", dhparams_file, "4096"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        if create:
+            print("⏳ Creating dhparams file. This will take a few minutes, be patient 🧘.")
+            p_dhparam = subprocess.Popen(
+                ["openssl", "dhparam", "-out", dhparams_file, "4096"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
 
-        if p_dhparam.wait() != 0:
-            out, err = p_dhparam.communicate(timeout=1)
-            print(f"❌ Could not create dhparams file: {out}\n{err}")
-            exit(6)
+            if p_dhparam.wait() != 0:
+                out, err = p_dhparam.communicate(timeout=1)
+                print(f"❌ Could not create dhparams file: {out}\n{err}")
+                exit(6)
+        else:
+            src_dhparams_file = path.join(path.sep, "usr", "share", "nginx", "dhparams.pem")
+            if path.isfile(src_dhparams_file):
+                copy(src_dhparams_file, dhparams_file)
 
 
 def apply_defaults(cfg: Box) -> Box:
@@ -359,7 +364,7 @@ env = Environment(loader=FileSystemLoader("templates"), trim_blocks=True, lstrip
 if path.isfile(path.join(NGINX_CONFIG_BASE, "default.conf")):
     remove(path.join(NGINX_CONFIG_BASE, "default.conf"))
 
-create_dhparams()
+create_dhparams(False)
 
 nginx = prepare_nginx_for_cert_request(cfg)
 handle_cert_request(get_grouped_domains(cfg))

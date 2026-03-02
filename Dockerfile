@@ -38,6 +38,7 @@ RUN mkdir -p /web_root
 COPY ./nginx/index.html /usr/share/nginx/index.html
 COPY ./nginx/background.jpg /usr/share/nginx/background.jpg
 COPY ./nginx/favicon.ico /usr/share/nginx/favicon.ico
+COPY ./nginx/dhparams.pem /usr/share/nginx/dhparams.pem
 
 # Create the webroot for certbot
 RUN mkdir -p /var/www/certbot

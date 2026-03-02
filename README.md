@@ -556,7 +556,7 @@ volumes:
   log_data:
 configs:
   smnrp:
-    - file: ./smnrp.yml
+    file: ./smnrp.yml
 services:
   ws:
     image: ethnexus/smnrpx
