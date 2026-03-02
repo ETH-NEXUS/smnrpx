@@ -366,6 +366,11 @@ if path.isfile(path.join(NGINX_CONFIG_BASE, "default.conf")):
 
 create_dhparams(False)
 
+# Render the nginx.conf with default parameters
+with open(NGINX_DOT_CONF, "w") as config:
+    template = env.get_template("nginx.conf.j2")
+    config.write(template.render(modules=cfg.get("modules", None)))
+
 nginx = prepare_nginx_for_cert_request(cfg)
 handle_cert_request(get_grouped_domains(cfg))
 kill_nginx(nginx)
@@ -457,9 +462,6 @@ for domain_name, domain in cfg.domains.items():
 
 
 # Create final nginx config and replace entrypoint with nginx
-with open(NGINX_DOT_CONF, "w") as config:
-    template = env.get_template("nginx.conf.j2")
-    config.write(template.render(modules=cfg.get("modules", {})))
 with open(SMNRP_NGINX_CONFIG, "w") as config:
     template = env.get_template("smnrp.conf.j2")
     config.write(template.render(certrequest=False, domains=cfg.domains))

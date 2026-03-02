@@ -67,7 +67,7 @@ COPY ./entrypoint.py /entrypoint.py
 COPY ./smnrp_reset /smnrp_reset
 COPY ./templates /templates
 COPY ./smnrp_schema.yml /smnrp_schema.yml
-RUN touch /etc/nginx/nginx.conf
+RUN echo "" > /etc/nginx/nginx.conf
 RUN chmod 755 /entrypoint.py /smnrp_reset
 
 # let the smnrp user own the needed files and dirs
