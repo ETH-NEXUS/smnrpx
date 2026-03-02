@@ -594,8 +594,9 @@ If you are using a local directory to bind mount `/etc/letsencrypt` (i.e. `smnrp
 
 In case you want to chain SMNRP*X* instances on the same host you need to configure the
 
-- `network_mode` to `host` and
-- omit the `ports` configuration.
+- `network_mode` to `host`
+- omit the `ports` configuration and
+- add the `NET_BIND_SERVICE` capability using `cap_add`
 
 ```yaml
 volumes:
@@ -608,6 +609,8 @@ services:
       - smnrp_data:/etc/letsencrypt
     ...
     network_mode: host
+    cap_add:
+      - NET_BIND_SERVICE
 ```
 
 ## Maintenance mode
