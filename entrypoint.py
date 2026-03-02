@@ -372,8 +372,6 @@ with open(NGINX_DOT_CONF, "w") as config:
     template = env.get_template("nginx.conf.j2")
     config.write(template.render(modules=cfg.get("modules", None)))
 
-print(get_grouped_domains(cfg))
-
 nginx = prepare_nginx_for_cert_request(cfg)
 handle_cert_request(get_grouped_domains(cfg))
 kill_nginx(nginx)
