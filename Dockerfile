@@ -21,6 +21,10 @@ RUN apt-get update && apt-get install -y \
   inotify-tools \
   apache2-utils
 
+# Support net bind capability
+RUN apt-get install -y libcap2-bin \
+ && setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx
+
 # Install debugging tools
 RUN apt-get install -y \
   vim \
