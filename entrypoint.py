@@ -299,11 +299,21 @@ def handle_cert_request(grouped_domains: dict):
             ]
             subprocess.run(cmd, check=True)
             # if certificate was requested create sym links for the other vhosts
+            target = path.join(LIVE, vhost)
             for domain_spec in domain_specs:
                 if domain_spec["type"] == "vhost" and domain_spec["domain"] != vhost:
-                    if path.isdir(path.join(LIVE, vhost)):
+                    if path.isdir(target):
+                        # It can happen that the directory is there because of
+                        # former self-signed certificate. Remove it to create a
+                        # symlink to the one containing the Let's Encrypt
+                        # certificate
+                        link = path.join(LIVE, domain_spec["domain"])
+                        if path.isdir(link):
+                            rmtree(link)
+                        if path.islink(link):
+                            remove(link)
                         with contextlib.suppress(FileExistsError):
-                            symlink(path.join(LIVE, vhost), path.join(LIVE, domain_spec["domain"]))
+                            symlink(target, link)
         except subprocess.CalledProcessError as err:
             print(f"❌ Cannot request certificate for domain '{vhost}'")
             print(err)
