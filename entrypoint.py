@@ -334,164 +334,171 @@ def expand_env_vars(value):
 
 # END helper functions
 
-print("🚀 Start SMNRP 🚀")
 
-# Get config from SMNRP environment variable if set
-if "SMNRP" in environ:
-    SMNRP_CONFIG = path.join(path.sep, "tmp", "smnrp.yml")
-    env_config = environ.get("SMNRP")
-    if env_config:
-        out_path = Path(SMNRP_CONFIG)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(env_config, encoding="utf-8")
-        print("✅ Take config from environment variable 'SMNRP'")
-else:
-    # Check if config is there
-    if not path.isfile(SMNRP_CONFIG):
-        print("❌ SMNRP config is missing")
-        print("👉 Please configure the config in docker-compose.yml:")
-        print("configs:")
-        print("  smnrp:")
-        print("    file: ./smnrp.yml")
-        print("services:")
-        print("  ws:")
-        print("    configs:")
-        print("      - source: smnrp")
-        print(f"        target: {SMNRP_CONFIG}")
-        exit(1)
+def main():
+    global SMNRP_CONFIG, env
 
-with open(SMNRP_CONFIG) as config_file:
-    config = expand_env_vars(yaml.safe_load(config_file))
-    check_smnrp_config(config)
-    cfg = Box(config)
+    print("🚀 Start SMNRP 🚀")
 
-# Apply config defaults to be most secure
-cfg = apply_defaults(cfg)
-
-# Create templating environment
-env = Environment(loader=FileSystemLoader("templates"), trim_blocks=True, lstrip_blocks=True)
-
-# Remove default nginx config
-if path.isfile(path.join(NGINX_CONFIG_BASE, "default.conf")):
-    remove(path.join(NGINX_CONFIG_BASE, "default.conf"))
-
-create_dhparams(False)
-
-# Render the nginx.conf with default parameters
-with open(NGINX_DOT_CONF, "w") as config:
-    template = env.get_template("nginx.conf.j2")
-    config.write(template.render(modules=cfg.get("modules", None)))
-
-nginx = prepare_nginx_for_cert_request(cfg)
-handle_cert_request(get_grouped_domains(cfg))
-kill_nginx(nginx)
-
-for domain_name, domain in cfg.domains.items():
-    # Copy over default files
-    populate_if_not_exists(domain_name, "index.html")
-    populate_if_not_exists(domain_name, "favicon.ico")
-    populate_if_not_exists(domain_name, "background.jpg")
-
-    # Prepare authentication
-    if "locations" in domain:
-        for _location in domain.locations:
-            _, location = next(iter(_location.items()))
-            if "auth" in location:
-                auth_config = path.join(
-                    NGINX_CONFIG_BASE,
-                    f".auth_{domain_name}{location.uri.replace(path.sep, '_')}",
-                )
-                if path.isfile(auth_config):
-                    remove(auth_config)
-                for auth in location.auth:
-                    try:
-                        print(
-                            f"👤 enable authentication on '{domain_name}{location.uri}' for user '{auth.user}', {auth_config}"
-                        )
-                        subprocess.run(
-                            [
-                                "htpasswd",
-                                "-b",
-                                *([] if path.isfile(auth_config) else ["-c"]),
-                                auth_config,
-                                auth.user,
-                                auth.password,
-                            ],
-                            check=True,
-                        )
-                    except subprocess.CalledProcessError:
-                        print(f"❌ Cannot create auth file for '{auth_config}'")
-                        exit(5)
-
-    if "disable_https" in domain and domain.disable_https:
-        print(f"⚠️ HTTPS is disabled for domain '{domain_name}'")
-        # Hash management of domain configs
-        new_hash = compute_domain_hash(domain_name, domain)
-        old_hash = get_domain_hash(DOMAIN_HASHES, domain_name)
-        if new_hash == old_hash and path.isfile(path.join(LIVE, domain_name, "fullchain.pem")):
-            # in this case we do not need to renew the certificate
-            continue
-        # let's create a new certificate
-        store_domain_hash(DOMAIN_HASHES, domain_name, domain)
-        # Generate self-signed certificates if needed
+    # Get config from SMNRP environment variable if set
+    if "SMNRP" in environ:
+        SMNRP_CONFIG = path.join(path.sep, "tmp", "smnrp.yml")
+        env_config = environ.get("SMNRP")
+        if env_config:
+            out_path = Path(SMNRP_CONFIG)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(env_config, encoding="utf-8")
+            print("✅ Take config from environment variable 'SMNRP'")
     else:
-        if "cert" in domain and domain.cert == "self-signed":
-            print(f"✅ using self-signed certificate for domain '{domain_name}'")
-            live = f"{LIVE}/{domain_name}"
-            makedirs(live, exist_ok=True)
-            csr_config = path.join(live, "csr.conf")
-            with open(csr_config, "w") as csr:
-                template = env.get_template("csr.conf.j2")
-                csr.write(template.render(domain_name=domain_name, domain=domain))
-            try:
-                cmd = [
-                    "openssl",
-                    "req",
-                    "-x509",
-                    "-nodes",
-                    "-days",
-                    "3650",
-                    "-newkey",
-                    "rsa:4096",
-                    "-keyout",
-                    path.join(live, "privkey.pem"),
-                    "-out",
-                    path.join(live, "fullchain.pem"),
-                    "-config",
-                    path.join(live, "csr.conf"),
-                ]
-                subprocess.run(cmd, check=True)
-            except subprocess.CalledProcessError:
-                print(f"❌ Cannot create self-signed certificate for domain '{domain_name}'")
-                print("Certificate Signing Request Config:")
-                with open(path.join(live, "csr.conf"), encoding="utf-8") as f:
-                    content = f.read()
-                print(content)
-                exit(7)
-        elif "cert" in domain and domain.cert == "own":
-            print("✅ using own certificate for domain '{domain_name}'")
+        # Check if config is there
+        if not path.isfile(SMNRP_CONFIG):
+            print("❌ SMNRP config is missing")
+            print("👉 Please configure the config in docker-compose.yml:")
+            print("configs:")
+            print("  smnrp:")
+            print("    file: ./smnrp.yml")
+            print("services:")
+            print("  ws:")
+            print("    configs:")
+            print("      - source: smnrp")
+            print(f"        target: {SMNRP_CONFIG}")
+            exit(1)
+
+    with open(SMNRP_CONFIG) as config_file:
+        config = expand_env_vars(yaml.safe_load(config_file))
+        check_smnrp_config(config)
+        cfg = Box(config)
+
+    # Apply config defaults to be most secure
+    cfg = apply_defaults(cfg)
+
+    # Create templating environment
+    env = Environment(loader=FileSystemLoader("templates"), trim_blocks=True, lstrip_blocks=True)
+
+    # Remove default nginx config
+    if path.isfile(path.join(NGINX_CONFIG_BASE, "default.conf")):
+        remove(path.join(NGINX_CONFIG_BASE, "default.conf"))
+
+    create_dhparams(False)
+
+    # Render the nginx.conf with default parameters
+    with open(NGINX_DOT_CONF, "w") as config:
+        template = env.get_template("nginx.conf.j2")
+        config.write(template.render(modules=cfg.get("modules", None)))
+
+    nginx = prepare_nginx_for_cert_request(cfg)
+    handle_cert_request(get_grouped_domains(cfg))
+    kill_nginx(nginx)
+
+    for domain_name, domain in cfg.domains.items():
+        # Copy over default files
+        populate_if_not_exists(domain_name, "index.html")
+        populate_if_not_exists(domain_name, "favicon.ico")
+        populate_if_not_exists(domain_name, "background.jpg")
+
+        # Prepare authentication
+        if "locations" in domain:
+            for _location in domain.locations:
+                _, location = next(iter(_location.items()))
+                if "auth" in location:
+                    auth_config = path.join(
+                        NGINX_CONFIG_BASE,
+                        f".auth_{domain_name}{location.uri.replace(path.sep, '_')}",
+                    )
+                    if path.isfile(auth_config):
+                        remove(auth_config)
+                    for auth in location.auth:
+                        try:
+                            print(
+                                f"👤 enable authentication on '{domain_name}{location.uri}' for user '{auth.user}', {auth_config}"
+                            )
+                            subprocess.run(
+                                [
+                                    "htpasswd",
+                                    "-b",
+                                    *([] if path.isfile(auth_config) else ["-c"]),
+                                    auth_config,
+                                    auth.user,
+                                    auth.password,
+                                ],
+                                check=True,
+                            )
+                        except subprocess.CalledProcessError:
+                            print(f"❌ Cannot create auth file for '{auth_config}'")
+                            exit(5)
+
+        if "disable_https" in domain and domain.disable_https:
+            print(f"⚠️ HTTPS is disabled for domain '{domain_name}'")
+            # Hash management of domain configs
+            new_hash = compute_domain_hash(domain_name, domain)
+            old_hash = get_domain_hash(DOMAIN_HASHES, domain_name)
+            if new_hash == old_hash and path.isfile(path.join(LIVE, domain_name, "fullchain.pem")):
+                # in this case we do not need to renew the certificate
+                continue
+            # let's create a new certificate
+            store_domain_hash(DOMAIN_HASHES, domain_name, domain)
+            # Generate self-signed certificates if needed
+        else:
+            if "cert" in domain and domain.cert == "self-signed":
+                print(f"✅ using self-signed certificate for domain '{domain_name}'")
+                live = f"{LIVE}/{domain_name}"
+                makedirs(live, exist_ok=True)
+                csr_config = path.join(live, "csr.conf")
+                with open(csr_config, "w") as csr:
+                    template = env.get_template("csr.conf.j2")
+                    csr.write(template.render(domain_name=domain_name, domain=domain))
+                try:
+                    cmd = [
+                        "openssl",
+                        "req",
+                        "-x509",
+                        "-nodes",
+                        "-days",
+                        "3650",
+                        "-newkey",
+                        "rsa:4096",
+                        "-keyout",
+                        path.join(live, "privkey.pem"),
+                        "-out",
+                        path.join(live, "fullchain.pem"),
+                        "-config",
+                        path.join(live, "csr.conf"),
+                    ]
+                    subprocess.run(cmd, check=True)
+                except subprocess.CalledProcessError:
+                    print(f"❌ Cannot create self-signed certificate for domain '{domain_name}'")
+                    print("Certificate Signing Request Config:")
+                    with open(path.join(live, "csr.conf"), encoding="utf-8") as f:
+                        content = f.read()
+                    print(content)
+                    exit(7)
+            elif "cert" in domain and domain.cert == "own":
+                print("✅ using own certificate for domain '{domain_name}'")
+
+    # Create final nginx config and replace entrypoint with nginx
+    with open(SMNRP_NGINX_CONFIG, "w") as config:
+        template = env.get_template("smnrp.conf.j2")
+        config.write(template.render(certrequest=False, domains=cfg.domains))
+
+    check_nginx_syntax()
+
+    pid = fork()
+    if pid == 0:
+        # initiating cert renew process as a separate process
+        cert_renew()
+    else:
+        # this becomes the new PID 0
+        args = argv[1:]
+        if args:
+            print(f"🙌 Executing {' '.join(args)}...")
+            execvp(args[0], args)
+        # else in the default case run nginx as the main process
+        print("🙌 Starting nginx...")
+        execvp(
+            "nginx",
+            ["nginx", "-g", "daemon off;"],
+        )
 
 
-# Create final nginx config and replace entrypoint with nginx
-with open(SMNRP_NGINX_CONFIG, "w") as config:
-    template = env.get_template("smnrp.conf.j2")
-    config.write(template.render(certrequest=False, domains=cfg.domains))
-
-check_nginx_syntax()
-
-pid = fork()
-if pid == 0:
-    # initiating cert renew process as a separate process
-    cert_renew()
-else:
-    # this becomes the new PID 0
-    args = argv[1:]
-    if args:
-        print(f"🙌 Executing {' '.join(args)}...")
-        execvp(args[0], args)
-    # else in the default case run nginx as the main process
-    print("🙌 Starting nginx...")
-    execvp(
-        "nginx",
-        ["nginx", "-g", "daemon off;"],
-    )
+if __name__ == "__main__":
+    main()

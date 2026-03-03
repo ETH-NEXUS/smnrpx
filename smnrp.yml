@@ -59,3 +59,4 @@ domains:
       - redirect:
           uri: /redir
           url: http://google.com
+nginx: log
