@@ -1,5 +1,6 @@
 domains: map(include('domain'), required=True)
 modules: include('module', required=False)
+nginx: include('nginx', required=False)
 ---
 domain:
   cert: enum('self-signed', 'own', 'letsencrypt', required=False)
@@ -71,3 +72,6 @@ user_pass:
 ---
 module:
   some_potential_module: bool(required=False)
+---
+nginx:
+  log_format: str(required=False)

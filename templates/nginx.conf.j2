@@ -18,13 +18,25 @@ http {
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
 
-    # log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-    #                   '$status $body_bytes_sent "$http_referer" '
-    #                   '"$http_user_agent" "$http_x_forwarded_for"';
+    {% if nginx.log_format %}
+    log_format custom {{ nginx.log_format }}
+    {% else %}
+    log_format custom
+        '[$status] '
+        '$remote_addr\t'
+        '--$request_method-->\t'
+        '$scheme://$host$request_uri\t'
+        '($request_time/'
+        '$upstream_response_time/'
+        '$upstream_status/'
+        '$body_bytes_sent)\t'
+        '"$http_referer" '
+        '"$http_user_agent"';
+    {% endif %}
 
-    # access_log  /dev/stdout main;
-    # access_log  /var/log/analytics/access.log combined;
-
+    access_log /dev/stdout custom;
+    error_log  /dev/stdout;
+    
     sendfile        on;
     # tcp_nopush     on;
 

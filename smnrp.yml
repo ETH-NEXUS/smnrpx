@@ -59,4 +59,15 @@ domains:
       - redirect:
           uri: /redir
           url: http://google.com
-nginx: log
+nginx:
+  log_format: >
+    '[$status] '
+    '$remote_addr\t'
+    '--$request_method-->\t'
+    '$scheme://$host$request_uri\t'
+    '($request_time/'
+    '$upstream_response_time/'
+    '$upstream_status/'
+    '$body_bytes_sent)\t'
+    '"$http_referer" '
+    '"$http_user_agent"';

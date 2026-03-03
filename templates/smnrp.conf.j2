@@ -96,8 +96,6 @@ server {
   {% else %}
   proxy_buffer_size 32k;
   {% endif %}
-  error_log  /dev/stdout;
-  access_log  /dev/stdout combined;
 
   root /web_root/{{ domain_name }};
   index index.html;

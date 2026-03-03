@@ -379,12 +379,16 @@ def main():
     if path.isfile(path.join(NGINX_CONFIG_BASE, "default.conf")):
         remove(path.join(NGINX_CONFIG_BASE, "default.conf"))
 
-    create_dhparams(False)
+    create_dhparams(
+        cfg.nginx.create_dhparams if "nginx" in cfg and "create_dhparams" in cfg.nginx else False
+    )
 
     # Render the nginx.conf with default parameters
     with open(NGINX_DOT_CONF, "w") as config:
         template = env.get_template("nginx.conf.j2")
-        config.write(template.render(modules=cfg.get("modules", None)))
+        config.write(
+            template.render(modules=cfg.get("modules", None), nginx=cfg.get("nginx", None))
+        )
 
     nginx = prepare_nginx_for_cert_request(cfg)
     handle_cert_request(get_grouped_domains(cfg))
