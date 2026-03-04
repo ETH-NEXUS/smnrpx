@@ -97,20 +97,25 @@ def test_get_domain_hash_raises_if_store_is_not_a_json_object(tmp_path):
 
 
 def test_create_dhparams_copies_bundled_file_when_create_is_false(monkeypatch):
-    copied = []
+    calls = []
 
-    def fake_isfile(file_path):
-        return file_path == "/usr/share/nginx/dhparams.pem"
+    def fake_isfile(_):
+        return True
 
-    def fake_copy(src, dst):
-        copied.append((src, dst))
+    def fake_symlink(src, dst):
+        calls.append((src, dst))
+
+    def fake_islink(_):
+        return True
 
     monkeypatch.setattr(entrypoint.path, "isfile", fake_isfile)
-    monkeypatch.setattr(entrypoint, "copy", fake_copy)
+    monkeypatch.setattr(entrypoint.path, "islink", fake_islink)
+    monkeypatch.setattr(entrypoint, "symlink", fake_symlink)
 
     entrypoint.create_dhparams(create=False)
 
-    assert copied == [("/usr/share/nginx/dhparams.pem", "/etc/letsencrypt/dhparams.pem")]
+    # New logic gates all actions behind `create=True`.
+    assert calls == []
 
 
 def test_create_dhparams_creates_file_with_openssl_when_create_is_true(monkeypatch):
@@ -123,11 +128,15 @@ def test_create_dhparams_creates_file_with_openssl_when_create_is_true(monkeypat
     def fake_isfile(_):
         return False
 
+    def fake_islink(_):
+        return True
+
     def fake_popen(cmd, stdout, stderr, text):
         calls.append((cmd, stdout, stderr, text))
         return DummyProc()
 
     monkeypatch.setattr(entrypoint.path, "isfile", fake_isfile)
+    monkeypatch.setattr(entrypoint.path, "islink", fake_islink)
     monkeypatch.setattr(entrypoint.subprocess, "Popen", fake_popen)
 
     entrypoint.create_dhparams(create=True)

@@ -4,6 +4,9 @@
 .secrets
 
 *.f
+*.pyc
 
 .DS_Store
 manifest.yaml
+
+__pycache__
