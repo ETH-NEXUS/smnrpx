@@ -5,6 +5,8 @@ from box import Box
 
 import entrypoint
 from smnrpx import certificates
+from smnrpx import configuration
+from smnrpx import nginx_runtime
 
 
 def test_get_grouped_domains_groups_vhosts_and_sans():
@@ -147,3 +149,109 @@ def test_create_dhparams_creates_file_with_openssl_when_create_is_true(monkeypat
         "/etc/letsencrypt/dhparams.pem",
         "4096",
     ]
+
+
+def test_expand_env_vars_expands_nested_values_and_keeps_missing(monkeypatch):
+    monkeypatch.setenv("SMNRPX_HOST", "example.org")
+
+    raw = {
+        "a": "${SMNRPX_HOST}",
+        "nested": ["https://${SMNRPX_HOST}", {"x": "${MISSING_VAR}"}],
+    }
+
+    expanded = configuration.expand_env_vars(raw)
+
+    assert expanded["a"] == "example.org"
+    assert expanded["nested"][0] == "https://example.org"
+    assert expanded["nested"][1]["x"] == "${MISSING_VAR}"
+
+
+def test_create_dhparams_noop_when_target_exists(monkeypatch):
+    calls = []
+
+    def fake_isfile(file_path):
+        return file_path == "/etc/letsencrypt/dhparams.pem"
+
+    def fake_popen(*_args, **_kwargs):
+        calls.append("popen")
+        raise AssertionError("Popen must not be called when dhparams exists")
+
+    def fake_symlink(*_args, **_kwargs):
+        calls.append("symlink")
+        raise AssertionError("Symlink must not be called when dhparams exists")
+
+    monkeypatch.setattr(certificates.path, "isfile", fake_isfile)
+    monkeypatch.setattr(certificates.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(certificates, "symlink", fake_symlink)
+
+    entrypoint.create_dhparams(create=True)
+
+    assert calls == []
+
+
+def test_create_dhparams_raises_when_openssl_fails(monkeypatch):
+    class DummyProc:
+        def wait(self):
+            return 1
+
+        def communicate(self, timeout):
+            return ("out", "err")
+
+    monkeypatch.setattr(certificates.path, "isfile", lambda _: False)
+    monkeypatch.setattr(certificates.subprocess, "Popen", lambda *_args, **_kwargs: DummyProc())
+
+    with pytest.raises(SystemExit) as exc:
+        entrypoint.create_dhparams(create=True)
+    assert exc.value.code == 6
+
+
+def test_handle_cert_request_builds_d_argument_without_trailing_comma(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, check):
+        calls.append((cmd, check))
+
+    monkeypatch.setattr(certificates.subprocess, "run", fake_run)
+    monkeypatch.setattr(certificates.path, "isdir", lambda _: False)
+
+    grouped_domains = {"example.org": [{"domain": "api.example.org", "type": "vhost"}]}
+
+    entrypoint.handle_cert_request(grouped_domains)
+
+    assert len(calls) == 1
+    cmd, check = calls[0]
+    assert check is True
+    d_idx = cmd.index("-d")
+    assert cmd[d_idx + 1] == "api.example.org"
+
+
+def test_handle_cert_request_cleans_up_on_certbot_failure(monkeypatch):
+    removed_dirs = []
+
+    def fake_run(*_args, **_kwargs):
+        raise certificates.subprocess.CalledProcessError(returncode=1, cmd="certbot")
+
+    def fake_isdir(file_path):
+        return file_path == "/etc/letsencrypt/live/api.example.org"
+
+    monkeypatch.setattr(certificates.subprocess, "run", fake_run)
+    monkeypatch.setattr(certificates.path, "isdir", fake_isdir)
+    monkeypatch.setattr(certificates, "rmtree", lambda p: removed_dirs.append(p))
+
+    grouped_domains = {"example.org": [{"domain": "api.example.org", "type": "vhost"}]}
+
+    with pytest.raises(SystemExit, match="3"):
+        entrypoint.handle_cert_request(grouped_domains)
+
+    assert removed_dirs == ["/etc/letsencrypt/live/api.example.org"]
+
+
+def test_remove_default_nginx_conf_removes_existing_file(tmp_path):
+    base = tmp_path / "conf.d"
+    base.mkdir(parents=True)
+    default_conf = base / "default.conf"
+    default_conf.write_text("server {}", encoding="utf-8")
+
+    nginx_runtime.remove_default_nginx_conf(str(base))
+
+    assert not default_conf.exists()
