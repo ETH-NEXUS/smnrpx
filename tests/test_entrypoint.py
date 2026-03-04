@@ -4,6 +4,7 @@ import pytest
 from box import Box
 
 import entrypoint
+from smnrpx import certificates
 
 
 def test_get_grouped_domains_groups_vhosts_and_sans():
@@ -99,23 +100,20 @@ def test_get_domain_hash_raises_if_store_is_not_a_json_object(tmp_path):
 def test_create_dhparams_copies_bundled_file_when_create_is_false(monkeypatch):
     calls = []
 
-    def fake_isfile(_):
-        return True
+    def fake_isfile(file_path):
+        return file_path == "/usr/share/nginx/dhparams.pem"
 
     def fake_symlink(src, dst):
         calls.append((src, dst))
 
-    def fake_islink(_):
-        return True
-
-    monkeypatch.setattr(entrypoint.path, "isfile", fake_isfile)
-    monkeypatch.setattr(entrypoint.path, "islink", fake_islink)
-    monkeypatch.setattr(entrypoint, "symlink", fake_symlink)
+    monkeypatch.setattr(certificates.path, "isfile", fake_isfile)
+    monkeypatch.setattr(certificates.path, "islink", lambda _: False)
+    monkeypatch.setattr(certificates.path, "isdir", lambda _: False)
+    monkeypatch.setattr(certificates, "symlink", fake_symlink)
 
     entrypoint.create_dhparams(create=False)
 
-    # New logic gates all actions behind `create=True`.
-    assert calls == []
+    assert calls == [("/usr/share/nginx/dhparams.pem", "/etc/letsencrypt/dhparams.pem")]
 
 
 def test_create_dhparams_creates_file_with_openssl_when_create_is_true(monkeypatch):
@@ -135,9 +133,9 @@ def test_create_dhparams_creates_file_with_openssl_when_create_is_true(monkeypat
         calls.append((cmd, stdout, stderr, text))
         return DummyProc()
 
-    monkeypatch.setattr(entrypoint.path, "isfile", fake_isfile)
-    monkeypatch.setattr(entrypoint.path, "islink", fake_islink)
-    monkeypatch.setattr(entrypoint.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(certificates.path, "isfile", fake_isfile)
+    monkeypatch.setattr(certificates.path, "islink", fake_islink)
+    monkeypatch.setattr(certificates.subprocess, "Popen", fake_popen)
 
     entrypoint.create_dhparams(create=True)
 

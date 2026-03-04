@@ -44,8 +44,8 @@ domains:
               password: admin
             - user: dave
               password: secret
-          whitelist:
-            - 127.0.0.1
+          # whitelist:
+          #   - 127.0.0.1
           custom:
             - proxy_set_header Host $http_host
       - alias:

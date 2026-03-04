@@ -68,6 +68,7 @@ RUN groupadd --gid 1000 smnrp \
 
 # Copy the entrypoint
 COPY ./entrypoint.py /entrypoint.py
+COPY ./smnrpx /smnrpx
 COPY ./smnrp_reset /smnrp_reset
 COPY ./templates /templates
 COPY ./smnrp_schema.yml /smnrp_schema.yml
@@ -77,6 +78,7 @@ RUN chmod 755 /entrypoint.py /smnrp_reset
 # let the smnrp user own the needed files and dirs
 RUN chown -R smnrp:smnrp \
   /entrypoint.py \
+  /smnrpx \
   /smnrp_reset \
   /etc/nginx/conf.d \
   /etc/nginx/nginx.conf \
