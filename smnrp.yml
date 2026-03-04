@@ -60,6 +60,7 @@ domains:
           uri: /redir
           url: http://google.com
 nginx:
+  create_dhparams: true
   log_format: >
     '[$status] '
     '$remote_addr\t'

@@ -177,8 +177,8 @@ def cert_renew():
 
 def create_dhparams(create: bool = True):
     dhparams_file = path.join(path.sep, "etc", "letsencrypt", "dhparams.pem")
-    if not path.isfile(dhparams_file):
-        if create:
+    if create and path.islink(dhparams_file):
+        if not path.isfile(dhparams_file):
             print("⏳ Creating dhparams file. This will take a few minutes, be patient 🧘.")
             p_dhparam = subprocess.Popen(
                 ["openssl", "dhparam", "-out", dhparams_file, "4096"],
@@ -194,7 +194,7 @@ def create_dhparams(create: bool = True):
         else:
             src_dhparams_file = path.join(path.sep, "usr", "share", "nginx", "dhparams.pem")
             if path.isfile(src_dhparams_file):
-                copy(src_dhparams_file, dhparams_file)
+                symlink(src_dhparams_file, dhparams_file)
 
 
 def apply_defaults(cfg: Box) -> Box:
@@ -308,10 +308,10 @@ def handle_cert_request(grouped_domains: dict):
                         # symlink to the one containing the Let's Encrypt
                         # certificate
                         link = path.join(LIVE, domain_spec["domain"])
-                        if path.isdir(link):
-                            rmtree(link)
                         if path.islink(link):
                             remove(link)
+                        elif path.isdir(link):
+                            rmtree(link)
                         with contextlib.suppress(FileExistsError):
                             symlink(target, link)
         except subprocess.CalledProcessError as err:

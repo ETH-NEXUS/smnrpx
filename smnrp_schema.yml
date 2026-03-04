@@ -74,4 +74,5 @@ module:
   some_potential_module: bool(required=False)
 ---
 nginx:
+  create_dhparams: bool(required=False)
   log_format: str(required=False)
