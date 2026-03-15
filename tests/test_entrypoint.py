@@ -211,6 +211,7 @@ def test_handle_cert_request_builds_d_argument_without_trailing_comma(monkeypatc
     def fake_run(cmd, check):
         calls.append((cmd, check))
 
+    monkeypatch.setattr(certificates, "store_hash_value", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(certificates.subprocess, "run", fake_run)
     monkeypatch.setattr(certificates.path, "isdir", lambda _: False)
 
@@ -223,6 +224,38 @@ def test_handle_cert_request_builds_d_argument_without_trailing_comma(monkeypatc
     assert check is True
     d_idx = cmd.index("-d")
     assert cmd[d_idx + 1] == "api.example.org"
+
+
+def test_handle_cert_request_skips_unchanged_requests(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(certificates, "get_domain_hash", lambda *_args, **_kwargs: "same-hash")
+    monkeypatch.setattr(certificates, "compute_certificate_request_hash", lambda *_args, **_kwargs: "same-hash")
+    monkeypatch.setattr(certificates.path, "isfile", lambda file_path: file_path == "/etc/letsencrypt/live/api.example.org/fullchain.pem")
+    monkeypatch.setattr(certificates.subprocess, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    grouped_domains = {"example.org": [{"domain": "api.example.org", "type": "vhost"}]}
+
+    entrypoint.handle_cert_request(grouped_domains)
+
+    assert calls == []
+
+
+def test_handle_cert_request_stores_hash_after_success(monkeypatch):
+    stored = []
+
+    monkeypatch.setattr(certificates, "get_domain_hash", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(certificates, "compute_certificate_request_hash", lambda *_args, **_kwargs: "new-hash")
+    monkeypatch.setattr(certificates, "store_hash_value", lambda *args: stored.append(args))
+    monkeypatch.setattr(certificates.path, "isfile", lambda *_: False)
+    monkeypatch.setattr(certificates.path, "isdir", lambda *_: False)
+    monkeypatch.setattr(certificates.subprocess, "run", lambda *_args, **_kwargs: None)
+
+    grouped_domains = {"example.org": [{"domain": "api.example.org", "type": "vhost"}]}
+
+    entrypoint.handle_cert_request(grouped_domains)
+
+    assert stored == [("/etc/letsencrypt/live/domain_hashes.json", "example.org", "new-hash")]
 
 
 def test_handle_cert_request_cleans_up_on_certbot_failure(monkeypatch):

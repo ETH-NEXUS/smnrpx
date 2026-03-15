@@ -11,7 +11,6 @@ from smnrpx.assets import populate_if_not_exists
 from smnrpx.certificates import cert_renew, create_dhparams, handle_cert_request
 from smnrpx.configuration import apply_defaults, check_smnrp_config, expand_env_vars
 from smnrpx.constants import (
-    DOMAIN_HASHES,
     LIVE,
     NGINX_CONFIG_BASE,
     NGINX_DOT_CONF,
@@ -19,7 +18,6 @@ from smnrpx.constants import (
     SMNRP_NGINX_CONFIG,
 )
 from smnrpx.domains import get_grouped_domains
-from smnrpx.hashing import compute_domain_hash, get_domain_hash, store_domain_hash
 from smnrpx.nginx_runtime import (
     check_nginx_syntax,
     kill_nginx,
@@ -109,11 +107,6 @@ def _process_domain_certificates(cfg: Box, env: Environment):
 
         if "disable_https" in domain and domain.disable_https:
             print(f"⚠️ HTTPS is disabled for domain '{domain_name}'")
-            new_hash = compute_domain_hash(domain_name, domain)
-            old_hash = get_domain_hash(DOMAIN_HASHES, domain_name)
-            if new_hash == old_hash and path.isfile(path.join(LIVE, domain_name, "fullchain.pem")):
-                continue
-            store_domain_hash(DOMAIN_HASHES, domain_name, domain)
             continue
 
         if "cert" in domain and domain.cert == "self-signed":
@@ -155,7 +148,9 @@ def _process_domain_certificates(cfg: Box, env: Environment):
 def _render_nginx_config(cfg: Box, env: Environment):
     with open(NGINX_DOT_CONF, "w", encoding="utf-8") as config_file:
         template = env.get_template("nginx.conf.j2")
-        config_file.write(template.render(modules=cfg.get("modules", None), nginx=cfg.get("nginx", None)))
+        config_file.write(
+            template.render(modules=cfg.get("modules", None), nginx=cfg.get("nginx", None))
+        )
 
 
 def _render_final_smnrp_conf(cfg: Box, env: Environment):

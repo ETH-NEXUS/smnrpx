@@ -4,7 +4,8 @@ from os import path, remove, symlink
 from shutil import rmtree
 from time import sleep
 
-from smnrpx.constants import CERT_RENEW_TIMEOUT, LIVE
+from smnrpx.constants import CERT_RENEW_TIMEOUT, DOMAIN_HASHES, LIVE
+from smnrpx.hashing import compute_certificate_request_hash, get_domain_hash, store_hash_value
 
 
 def cert_renew():
@@ -69,25 +70,32 @@ def create_dhparams(create: bool = True):
 
 
 def handle_cert_request(grouped_domains: dict):
-    for _, domain_specs in grouped_domains.items():
+    for group_name, domain_specs in grouped_domains.items():
         vhost = None
-        sans: list[str] = []
+        additional_domains: list[str] = []
         for domain_spec in domain_specs:
             if domain_spec["type"] == "vhost":
-                vhost = domain_spec["domain"]
-                sans = [
-                    item["domain"]
-                    for item in domain_specs
-                    if item["domain"] != vhost
-                ]
-                break
+                if vhost is None:
+                    vhost = domain_spec["domain"]
+                else:
+                    additional_domains.append(domain_spec["domain"])
+                continue
+
+            additional_domains.append(domain_spec["domain"])
 
         if vhost is None:
             continue
 
-        print(f"✅ requesting certificate from letsencrypt for domain '{vhost}'")
+        cert_request_hash = compute_certificate_request_hash(vhost, additional_domains)
+        current_hash = get_domain_hash(DOMAIN_HASHES, group_name)
+        cert_path = path.join(LIVE, vhost, "fullchain.pem")
+        if current_hash == cert_request_hash and path.isfile(cert_path):
+            print(f"ℹ️ no need to request certificate for domain group '{group_name}'")
+            continue
+
+        print(f"✅ will request certificate for domain group '{group_name}'")
         try:
-            domain_list = ",".join([vhost, *sans])
+            domain_list = ",".join([vhost, *additional_domains])
             cmd = [
                 "certbot",
                 "certonly",
@@ -105,6 +113,7 @@ def handle_cert_request(grouped_domains: dict):
                 "/tmp",
             ]
             subprocess.run(cmd, check=True)
+            store_hash_value(DOMAIN_HASHES, group_name, cert_request_hash)
 
             target = path.join(LIVE, vhost)
             for domain_spec in domain_specs:
