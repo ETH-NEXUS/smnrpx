@@ -139,6 +139,37 @@ server {
 
   {% if domain.locations %}
   {% for location in domain.locations %}
+  {% if location.proxy and location.proxy.auth_request and not location.proxy.auth_request.startswith('/') %}
+  location = /__smnrpx_auth_request_proxy_{{ loop.index0 }} {
+    internal;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header X-Original-Method $request_method;
+    proxy_set_header X-Original-URI $request_uri;
+    proxy_set_header X-Original-Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass {{ location.proxy.auth_request }};
+  }
+  {% endif %}
+  {% if location.alias and location.alias.auth_request and not location.alias.auth_request.startswith('/') %}
+  location = /__smnrpx_auth_request_alias_{{ loop.index0 }} {
+    internal;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header X-Original-Method $request_method;
+    proxy_set_header X-Original-URI $request_uri;
+    proxy_set_header X-Original-Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass {{ location.alias.auth_request }};
+  }
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {% if domain.locations %}
+  {% for location in domain.locations %}
   {% if location.proxy %}
   location {{ location.proxy.uri }} {
     {% if location.proxy.whitelist %}
@@ -150,6 +181,13 @@ server {
     {% if location.proxy.auth %}
     auth_basic "Authorization Required";
     auth_basic_user_file /etc/nginx/conf.d/.auth_{{domain_name}}{{location.proxy.uri|replace("/", "_")}};
+    {% endif %}
+    {% if location.proxy.auth_request %}
+    {% if location.proxy.auth_request.startswith('/') %}
+    auth_request {{ location.proxy.auth_request }};
+    {% else %}
+    auth_request /__smnrpx_auth_request_proxy_{{ loop.index0 }};
+    {% endif %}
     {% endif %}
     {% if location.proxy.disable_cache %}
     add_header Last-Modified $date_gmt;
@@ -200,6 +238,13 @@ server {
     {% if location.alias.auth %}
     auth_basic "Authorization Required";
     auth_basic_user_file /etc/nginx/conf.d/.auth_{{domain_name}}{{location.alias.uri|replace("/", "_")}};
+    {% endif %}
+    {% if location.alias.auth_request %}
+    {% if location.alias.auth_request.startswith('/') %}
+    auth_request {{ location.alias.auth_request }};
+    {% else %}
+    auth_request /__smnrpx_auth_request_alias_{{ loop.index0 }};
+    {% endif %}
     {% endif %}
     {% if location.alias.disable_cache %}
     add_header Last-Modified $date_gmt;
