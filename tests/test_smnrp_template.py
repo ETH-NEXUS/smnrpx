@@ -90,3 +90,97 @@ def test_alias_auth_request_external_url_uses_internal_helper_location():
     assert "location = /__smnrpx_auth_request_alias_0 {" in rendered
     assert "proxy_pass https://auth.example.org/check-files;" in rendered
     assert "auth_request /__smnrpx_auth_request_alias_0;" in rendered
+
+
+def test_oauth_url_external_applies_auth_request_to_all_locations():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+                "oauth_url": "https://proxy.auth.nexus.ethz.ch/oauth2/",
+                "upstreams": {"api": ["api:8000"]},
+                "locations": [
+                    {
+                        "proxy": {
+                            "uri": "/",
+                            "proto": "http",
+                            "upstream": "api",
+                            "path": "/",
+                        }
+                    },
+                    {
+                        "proxy": {
+                            "uri": "/api/",
+                            "proto": "http",
+                            "upstream": "api",
+                            "path": "/",
+                        }
+                    },
+                ],
+            }
+        }
+    )
+
+    assert "location = /__smnrpx_oauth_auth {" in rendered
+    assert "proxy_pass https://proxy.auth.nexus.ethz.ch/oauth2/auth;" in rendered
+    assert "location /oauth2/ {" in rendered
+    assert "proxy_pass https://proxy.auth.nexus.ethz.ch/oauth2/;" in rendered
+    assert rendered.count("auth_request /__smnrpx_oauth_auth;") == 2
+    assert (
+        rendered.count("error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;")
+        == 1
+    )
+
+
+def test_oauth_url_internal_uses_direct_auth_request_uri():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+                "oauth_url": "/oauth2/",
+                "locations": [
+                    {
+                        "alias": {
+                            "uri": "/",
+                            "path": "/srv/www",
+                        }
+                    }
+                ],
+            }
+        }
+    )
+
+    assert "auth_request /oauth2/auth;" in rendered
+    assert "location = /__smnrpx_oauth_auth {" not in rendered
+    assert "location /oauth2/ {" not in rendered
+    assert "error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;" in rendered
+
+
+def test_location_auth_request_overrides_global_oauth_url():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+                "oauth_url": "https://proxy.auth.nexus.ethz.ch/oauth2/",
+                "upstreams": {"api": ["api:8000"]},
+                "locations": [
+                    {
+                        "proxy": {
+                            "uri": "/",
+                            "proto": "http",
+                            "upstream": "api",
+                            "path": "/",
+                            "auth_request": "/custom-auth/",
+                        }
+                    }
+                ],
+            }
+        }
+    )
+
+    assert "auth_request /custom-auth/;" in rendered
+    assert "auth_request /__smnrpx_oauth_auth;" not in rendered
+    assert "error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;" not in rendered

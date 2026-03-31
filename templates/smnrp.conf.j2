@@ -137,6 +137,41 @@ server {
     root /usr/share/nginx/html;
   }
 
+  {% if domain.oauth_url %}
+  {% set oauth_base_url = domain.oauth_url if domain.oauth_url.endswith('/') else domain.oauth_url ~ '/' %}
+  {% if domain.oauth_url.startswith('/') %}
+  {% set oauth_auth_request_uri = domain.oauth_url.rstrip('/') ~ '/auth' %}
+  {% else %}
+  {% set oauth_auth_request_uri = '/__smnrpx_oauth_auth' %}
+  {% endif %}
+  {% endif %}
+
+  {% if domain.oauth_url and not domain.oauth_url.startswith('/') %}
+  location = /__smnrpx_oauth_auth {
+    internal;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header X-Original-Method $request_method;
+    proxy_set_header X-Original-URI $request_uri;
+    proxy_set_header X-Original-Host $host;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass {{ oauth_base_url }}auth;
+  }
+
+  location = /oauth2 {
+    return 302 /oauth2/;
+  }
+
+  location /oauth2/ {
+    proxy_pass {{ oauth_base_url }};
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+  {% endif %}
+
   {% if domain.locations %}
   {% for location in domain.locations %}
   {% if location.proxy and location.proxy.auth_request and not location.proxy.auth_request.startswith('/') %}
@@ -187,6 +222,11 @@ server {
     auth_request {{ location.proxy.auth_request }};
     {% else %}
     auth_request /__smnrpx_auth_request_proxy_{{ loop.index0 }};
+    {% endif %}
+    {% elif domain.oauth_url %}
+    auth_request {{ oauth_auth_request_uri }};
+    {% if location.proxy.uri == '/' %}
+    error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;
     {% endif %}
     {% endif %}
     {% if location.proxy.disable_cache %}
@@ -244,6 +284,11 @@ server {
     auth_request {{ location.alias.auth_request }};
     {% else %}
     auth_request /__smnrpx_auth_request_alias_{{ loop.index0 }};
+    {% endif %}
+    {% elif domain.oauth_url %}
+    auth_request {{ oauth_auth_request_uri }};
+    {% if location.alias.uri == '/' %}
+    error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;
     {% endif %}
     {% endif %}
     {% if location.alias.disable_cache %}
