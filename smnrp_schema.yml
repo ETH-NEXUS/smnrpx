@@ -16,6 +16,7 @@ domain:
   proxy_buffer_size: str(required=False)
   client_max_body_size: str(required=False)
   client_body_buffer_size: str(required=False)
+  absolute_redirect: bool(required=False)
   allow_tls1.2: bool(required=False)
   disable_ocsp_stapling: bool(required = False)
   oauth_url: str(required=False)

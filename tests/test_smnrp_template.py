@@ -184,3 +184,105 @@ def test_location_auth_request_overrides_global_oauth_url():
     assert "auth_request /custom-auth/;" in rendered
     assert "auth_request /__smnrpx_oauth_auth;" not in rendered
     assert "error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;" not in rendered
+
+
+def test_allow_tls1_2_enables_tls12_and_tls13():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "cert": "self-signed",
+                "allow_tls1.2": True,
+                "disable_ocsp_stapling": False,
+            }
+        }
+    )
+
+    assert "ssl_protocols TLSv1.2 TLSv1.3;" in rendered
+    assert "ssl_protocols TLSv1.3;" not in rendered
+
+
+def test_ocsp_stapling_is_enabled_by_default_for_letsencrypt_and_can_be_disabled():
+    rendered_default = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "allow_tls1.2": False,
+                "disable_ocsp_stapling": False,
+            }
+        }
+    )
+    rendered_disabled = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "allow_tls1.2": False,
+                "disable_ocsp_stapling": True,
+            }
+        }
+    )
+
+    assert "ssl_stapling on;" in rendered_default
+    assert "ssl_stapling_verify on;" in rendered_default
+    assert "ssl_stapling on;" not in rendered_disabled
+
+
+def test_disable_cache_keeps_security_headers_in_location_context():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "disable_https": True,
+                "upstreams": {"api": ["api:8000"]},
+                "locations": [
+                    {
+                        "proxy": {
+                            "uri": "/api/",
+                            "proto": "http",
+                            "upstream": "api",
+                            "path": "/",
+                            "disable_cache": True,
+                        }
+                    }
+                ],
+            }
+        }
+    )
+
+    # Security headers are emitted in both server and location context.
+    assert rendered.count('add_header Strict-Transport-Security "max-age=31536000; includeSubdomains; preload";') == 2
+    assert rendered.count('add_header X-Frame-Options "SAMEORIGIN";') == 2
+    assert rendered.count("add_header Referrer-Policy strict-origin-when-cross-origin;") == 2
+
+    # disable_cache locations use the strict cache-control header and avoid duplicating the default one.
+    assert rendered.count('add_header Cache-Control no-cache="Set-Cookie";') == 1
+    assert "add_header Cache-Control 'private no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';" in rendered
+
+
+def test_absolute_redirect_can_be_disabled_per_domain():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+                "absolute_redirect": False,
+            }
+        }
+    )
+
+    assert "absolute_redirect off;" in rendered
+    assert "absolute_redirect on;" not in rendered
+
+
+def test_absolute_redirect_can_be_enabled_explicitly_per_domain():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+                "absolute_redirect": True,
+            }
+        }
+    )
+
+    assert "absolute_redirect on;" in rendered

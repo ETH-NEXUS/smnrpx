@@ -280,6 +280,7 @@ A domain contains different `upstreams`, `locations` and additional configuratio
 - `proxy_buffer_size`: The proxy buffer size.
 - `client_max_body_size`: The client max body size.
 - `client_body_buffer_size`: The client body buffer size.
+- `absolute_redirect`: true or false, to set nginx `absolute_redirect on|off` at server level. If omitted, nginx default behavior applies (on).
 - `allow_tls1.2`: true or false, if you want to support also tls1.2. Default only supports tls1.3
 - `disable_ocsp_stapling`: true or false, if you want to disable ocsp stapling. Default is false.
 - `oauth_url`: Optional oauth2-proxy base URL (for example `https://proxy.auth.nexus.ethz.ch/oauth2/`). If set, all `proxy` and `alias` locations get an auth check against `<oauth_url>/auth`. On `401` for the root location `/`, requests are redirected to `/oauth2/start?rd=<original_url>`.
@@ -536,7 +537,7 @@ With the `exposed_https` you can configure the **exposed ssl server port** SMNRP
 
 ## Configure SMNRP*X* using environment variables
 
-You can add `${env-var}` in the config to replace certain values with environment variables.
+You can add `${env-var}` in the config to replace values and mapping keys with environment variables.
 
 ```yaml
 domains:

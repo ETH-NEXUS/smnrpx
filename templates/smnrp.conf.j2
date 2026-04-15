@@ -1,3 +1,20 @@
+{% macro security_headers(domain, include_cache_control=true) -%}
+add_header Strict-Transport-Security "max-age=31536000; includeSubdomains; preload";
+
+proxy_hide_header Referrer-Policy;
+add_header Referrer-Policy strict-origin-when-cross-origin;
+
+add_header X-Frame-Options "SAMEORIGIN";
+add_header X-Content-Type-Options nosniff;
+{% if include_cache_control %}
+add_header Cache-Control no-cache="Set-Cookie";
+{% endif %}
+
+{% if domain.csp %}
+add_header Content-Security-Policy "{{ domain.csp }}" always;
+{% endif %}
+{%- endmacro %}
+
 {% for domain_name, domain in domains.items() %}
 map $http_upgrade $connection_upgrade {
     default upgrade;
@@ -23,6 +40,9 @@ server {
   {% endif %}
   http2 on;
   server_name {{ domain_name }} {{ domain.sans|join(' ') }};
+  {% if "absolute_redirect" in domain %}
+  absolute_redirect {{ "on" if domain.absolute_redirect else "off" }};
+  {% endif %}
 
   {% if not domain.disable_https %}
   {% if certrequest %}
@@ -49,13 +69,16 @@ server {
   {% endif %}
   http2 on;
   server_name {{ domain_name }} {{ domain.sans|join(' ') }};
+  {% if "absolute_redirect" in domain %}
+  absolute_redirect {{ "on" if domain.absolute_redirect else "off" }};
+  {% endif %}
 
   ssl_certificate "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem";
   ssl_certificate_key "/etc/letsencrypt/live/{{ domain_name }}/privkey.pem";
 
   ssl_dhparam /etc/letsencrypt/dhparams.pem;
 
-  {% if domain["allow_tsl1.2"] %}
+  {% if domain.get("allow_tls1.2", false) %}
   ssl_protocols TLSv1.2 TLSv1.3;
   {% else %}
   ssl_protocols TLSv1.3;
@@ -68,7 +91,8 @@ server {
   ssl_session_timeout 1440m;
   ssl_session_tickets off;
 
-  {% if domain.cert and domain.cert != 'self-signed' and domain.disable_ocsp_stapling %}
+  {% set cert_type = domain.get("cert", "letsencrypt") %}
+  {% if cert_type != 'self-signed' and not domain.get("disable_ocsp_stapling", false) %}
   ssl_stapling on;
   ssl_stapling_verify on;
   resolver 8.8.8.8 8.8.4.4 valid=300s;
@@ -76,18 +100,7 @@ server {
   {% endif %}
 {% endif %} {# END if not domain.disable_https #}
 
-  add_header Strict-Transport-Security "max-age=31536000; includeSubdomains; preload";
-
-  proxy_hide_header Referrer-Policy;
-  add_header Referrer-Policy strict-origin-when-cross-origin;
-  
-  add_header X-Frame-Options "SAMEORIGIN";
-  add_header X-Content-Type-Options nosniff;
-  add_header Cache-Control no-cache="Set-Cookie";
-  
-  {% if domain.csp %}
-  add_header Content-Security-Policy "{{ domain.csp }}" always;
-  {% endif %}
+  {{ security_headers(domain) }}
 
   proxy_read_timeout 180s;
   proxy_buffers 8 32k;
@@ -230,6 +243,7 @@ server {
     {% endif %}
     {% endif %}
     {% if location.proxy.disable_cache %}
+    {{ security_headers(domain, include_cache_control=false) }}
     add_header Last-Modified $date_gmt;
     add_header Cache-Control 'private no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';
     if_modified_since off;
@@ -292,6 +306,7 @@ server {
     {% endif %}
     {% endif %}
     {% if location.alias.disable_cache %}
+    {{ security_headers(domain, include_cache_control=false) }}
     add_header Last-Modified $date_gmt;
     add_header Cache-Control 'private no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';
     if_modified_since off;
