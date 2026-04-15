@@ -538,6 +538,7 @@ With the `exposed_https` you can configure the **exposed ssl server port** SMNRP
 ## Configure SMNRP*X* using environment variables
 
 You can add `${env-var}` in the config to replace values and mapping keys with environment variables.
+If a value is exactly `${env-var}`, SMNRP*X* parses the environment value as YAML so booleans/lists/maps can be injected (for example `true` or `["a.example.org"]`).
 
 ```yaml
 domains:
