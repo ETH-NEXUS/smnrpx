@@ -225,3 +225,64 @@ def test_ocsp_stapling_is_enabled_by_default_for_letsencrypt_and_can_be_disabled
     assert "ssl_stapling on;" in rendered_default
     assert "ssl_stapling_verify on;" in rendered_default
     assert "ssl_stapling on;" not in rendered_disabled
+
+
+def test_disable_cache_keeps_security_headers_in_location_context():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "disable_https": True,
+                "upstreams": {"api": ["api:8000"]},
+                "locations": [
+                    {
+                        "proxy": {
+                            "uri": "/api/",
+                            "proto": "http",
+                            "upstream": "api",
+                            "path": "/",
+                            "disable_cache": True,
+                        }
+                    }
+                ],
+            }
+        }
+    )
+
+    # Security headers are emitted in both server and location context.
+    assert rendered.count('add_header Strict-Transport-Security "max-age=31536000; includeSubdomains; preload";') == 2
+    assert rendered.count('add_header X-Frame-Options "SAMEORIGIN";') == 2
+    assert rendered.count("add_header Referrer-Policy strict-origin-when-cross-origin;") == 2
+
+    # disable_cache locations use the strict cache-control header and avoid duplicating the default one.
+    assert rendered.count('add_header Cache-Control no-cache="Set-Cookie";') == 1
+    assert "add_header Cache-Control 'private no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';" in rendered
+
+
+def test_absolute_redirect_can_be_disabled_per_domain():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+                "absolute_redirect": False,
+            }
+        }
+    )
+
+    assert "absolute_redirect off;" in rendered
+    assert "absolute_redirect on;" not in rendered
+
+
+def test_absolute_redirect_can_be_enabled_explicitly_per_domain():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+                "absolute_redirect": True,
+            }
+        }
+    )
+
+    assert "absolute_redirect on;" in rendered
