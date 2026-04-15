@@ -23,7 +23,13 @@ def expand_env_vars(value):
     if isinstance(value, str):
         return ENV_VAR_PATTERN.sub(lambda m: environ.get(m.group(1), m.group(0)), value)
     if isinstance(value, dict):
-        return {k: expand_env_vars(v) for k, v in value.items()}
+        expanded = {}
+        for key, item in value.items():
+            expanded_key = expand_env_vars(key) if isinstance(key, str) else key
+            if expanded_key in expanded:
+                raise ValueError(f"Duplicate key after environment interpolation: {expanded_key!r}")
+            expanded[expanded_key] = expand_env_vars(item)
+        return expanded
     if isinstance(value, list):
         return [expand_env_vars(v) for v in value]
     return value

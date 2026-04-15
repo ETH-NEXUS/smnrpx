@@ -536,7 +536,7 @@ With the `exposed_https` you can configure the **exposed ssl server port** SMNRP
 
 ## Configure SMNRP*X* using environment variables
 
-You can add `${env-var}` in the config to replace certain values with environment variables.
+You can add `${env-var}` in the config to replace values and mapping keys with environment variables.
 
 ```yaml
 domains:

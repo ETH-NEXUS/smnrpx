@@ -170,6 +170,37 @@ def test_expand_env_vars_expands_nested_values_and_keeps_missing(monkeypatch):
     assert expanded["nested"][1]["x"] == "${MISSING_VAR}"
 
 
+def test_expand_env_vars_expands_mapping_keys(monkeypatch):
+    monkeypatch.setenv("SMNRPX_DOMAIN", "api.example.org")
+
+    raw = {
+        "domains": {
+            "${SMNRPX_DOMAIN}": {
+                "cert": "letsencrypt",
+            }
+        }
+    }
+
+    expanded = configuration.expand_env_vars(raw)
+
+    assert "api.example.org" in expanded["domains"]
+    assert expanded["domains"]["api.example.org"]["cert"] == "letsencrypt"
+
+
+def test_expand_env_vars_raises_on_duplicate_keys_after_expansion(monkeypatch):
+    monkeypatch.setenv("SMNRPX_DOMAIN", "api.example.org")
+
+    raw = {
+        "domains": {
+            "api.example.org": {"cert": "own"},
+            "${SMNRPX_DOMAIN}": {"cert": "letsencrypt"},
+        }
+    }
+
+    with pytest.raises(ValueError, match="Duplicate key after environment interpolation"):
+        configuration.expand_env_vars(raw)
+
+
 def test_create_dhparams_noop_when_target_exists(monkeypatch):
     calls = []
 
