@@ -184,3 +184,44 @@ def test_location_auth_request_overrides_global_oauth_url():
     assert "auth_request /custom-auth/;" in rendered
     assert "auth_request /__smnrpx_oauth_auth;" not in rendered
     assert "error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;" not in rendered
+
+
+def test_allow_tls1_2_enables_tls12_and_tls13():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "cert": "self-signed",
+                "allow_tls1.2": True,
+                "disable_ocsp_stapling": False,
+            }
+        }
+    )
+
+    assert "ssl_protocols TLSv1.2 TLSv1.3;" in rendered
+    assert "ssl_protocols TLSv1.3;" not in rendered
+
+
+def test_ocsp_stapling_is_enabled_by_default_for_letsencrypt_and_can_be_disabled():
+    rendered_default = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "allow_tls1.2": False,
+                "disable_ocsp_stapling": False,
+            }
+        }
+    )
+    rendered_disabled = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "allow_tls1.2": False,
+                "disable_ocsp_stapling": True,
+            }
+        }
+    )
+
+    assert "ssl_stapling on;" in rendered_default
+    assert "ssl_stapling_verify on;" in rendered_default
+    assert "ssl_stapling on;" not in rendered_disabled

@@ -9,9 +9,13 @@ from smnrpx.constants import DEFAULTS, ENV_VAR_PATTERN
 
 
 def apply_defaults(cfg: Box) -> Box:
-    for key, value in DEFAULTS.items():
-        if key not in cfg:
-            cfg[key] = value
+    if "domains" not in cfg:
+        return cfg
+
+    for domain in cfg.domains.values():
+        for key, value in DEFAULTS.items():
+            if key not in domain:
+                domain[key] = value
     return cfg
 
 

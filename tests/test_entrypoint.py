@@ -60,15 +60,19 @@ def test_get_grouped_domains_ignores_invalid_domains(capsys):
     assert "not-a-valid-domain" in out
 
 
-def test_apply_defaults_sets_missing_and_preserves_existing():
-    cfg = Box({"server_tokens": "on"})
+def test_apply_defaults_sets_missing_and_preserves_existing_per_domain():
+    cfg = Box({"domains": {"api.example.org": {"server_tokens": "on", "allow_tls1.2": True}}})
     applied = entrypoint.apply_defaults(cfg)
 
-    assert applied.server_tokens == "on"
+    domain = applied.domains["api.example.org"]
+    assert domain["server_tokens"] == "on"
+    assert domain["allow_tls1.2"] is True
     for key, value in entrypoint.DEFAULTS.items():
-        assert key in applied
-        if key != "server_tokens":
-            assert applied[key] == value
+        assert key in domain
+        if key not in {"server_tokens", "allow_tls1.2"}:
+            assert domain[key] == value
+
+    assert "server_tokens" not in applied
 
 
 def test_compute_domain_hash_is_stable_for_san_order():

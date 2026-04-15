@@ -55,7 +55,7 @@ server {
 
   ssl_dhparam /etc/letsencrypt/dhparams.pem;
 
-  {% if domain["allow_tsl1.2"] %}
+  {% if domain.get("allow_tls1.2", false) %}
   ssl_protocols TLSv1.2 TLSv1.3;
   {% else %}
   ssl_protocols TLSv1.3;
@@ -68,7 +68,8 @@ server {
   ssl_session_timeout 1440m;
   ssl_session_tickets off;
 
-  {% if domain.cert and domain.cert != 'self-signed' and domain.disable_ocsp_stapling %}
+  {% set cert_type = domain.get("cert", "letsencrypt") %}
+  {% if cert_type != 'self-signed' and not domain.get("disable_ocsp_stapling", false) %}
   ssl_stapling on;
   ssl_stapling_verify on;
   resolver 8.8.8.8 8.8.4.4 valid=300s;

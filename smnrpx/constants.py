@@ -16,6 +16,6 @@ DEFAULTS = {
     "proxy_buffer_size": "32k",
     "client_max_body_size": "1m",
     "client_body_buffer_size": "1k",
-    "allow_tls1_2": False,
+    "allow_tls1.2": False,
     "disable_ocsp_stapling": False,
 }
