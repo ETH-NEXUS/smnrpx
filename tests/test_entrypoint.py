@@ -187,6 +187,35 @@ def test_expand_env_vars_expands_mapping_keys(monkeypatch):
     assert expanded["domains"]["api.example.org"]["cert"] == "letsencrypt"
 
 
+def test_expand_env_vars_parses_exact_placeholder_as_typed_yaml(monkeypatch):
+    monkeypatch.setenv("SMNRPX_BOOL", "true")
+    monkeypatch.setenv("SMNRPX_SANS", '["a.example.org", "b.example.org"]')
+    monkeypatch.setenv("SMNRPX_HOST", "example.org")
+
+    raw = {
+        "disable_https": "${SMNRPX_BOOL}",
+        "sans": "${SMNRPX_SANS}",
+        "url": "https://${SMNRPX_HOST}/health",
+        "mixed": "flag=${SMNRPX_BOOL}",
+    }
+
+    expanded = configuration.expand_env_vars(raw)
+
+    assert expanded["disable_https"] is True
+    assert expanded["sans"] == ["a.example.org", "b.example.org"]
+    assert expanded["url"] == "https://example.org/health"
+    assert expanded["mixed"] == "flag=true"
+
+
+def test_expand_env_vars_keeps_exact_empty_env_as_empty_string(monkeypatch):
+    monkeypatch.setenv("SMNRPX_EMPTY", "")
+
+    raw = {"value": "${SMNRPX_EMPTY}"}
+    expanded = configuration.expand_env_vars(raw)
+
+    assert expanded["value"] == ""
+
+
 def test_expand_env_vars_raises_on_duplicate_keys_after_expansion(monkeypatch):
     monkeypatch.setenv("SMNRPX_DOMAIN", "api.example.org")
 

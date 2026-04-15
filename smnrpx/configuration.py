@@ -21,6 +21,20 @@ def apply_defaults(cfg: Box) -> Box:
 
 def expand_env_vars(value):
     if isinstance(value, str):
+        exact_match = ENV_VAR_PATTERN.fullmatch(value)
+        if exact_match:
+            env_name = exact_match.group(1)
+            env_value = environ.get(env_name)
+            if env_value is None:
+                return value
+            if env_value == "":
+                return ""
+
+            try:
+                return yaml.safe_load(env_value)
+            except yaml.YAMLError:
+                return env_value
+
         return ENV_VAR_PATTERN.sub(lambda m: environ.get(m.group(1), m.group(0)), value)
     if isinstance(value, dict):
         expanded = {}
