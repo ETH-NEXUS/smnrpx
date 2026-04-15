@@ -143,6 +143,9 @@ domains:
             - user: admin
               # and this password
               password: secret
+          # Optional auth_request middleware:
+          # use an internal URI (same nginx) or an absolute URL
+          auth_request: /auth/check/
           # Only allow access to this location from the listed networks
           whitelist:
             - 127.0.0.1/32
@@ -279,6 +282,7 @@ A domain contains different `upstreams`, `locations` and additional configuratio
 - `client_body_buffer_size`: The client body buffer size.
 - `allow_tls1.2`: true or false, if you want to support also tls1.2. Default only supports tls1.3
 - `disable_ocsp_stapling`: true or false, if you want to disable ocsp stapling. Default is false.
+- `oauth_url`: Optional oauth2-proxy base URL (for example `https://proxy.auth.nexus.ethz.ch/oauth2/`). If set, all `proxy` and `alias` locations get an auth check against `<oauth_url>/auth`. On `401` for the root location `/`, requests are redirected to `/oauth2/start?rd=<original_url>`.
 
 ### `upstreams`
 
@@ -288,12 +292,27 @@ Upstreams list all `upstreams` that can be referenced in the `locations` configu
 
 Locations are the core part of the configuration. Here you configure different types of locations to define what `uri` is handled how:
 
+If you configure `oauth_url` on a domain, the oauth auth check is applied to all `proxy` and `alias` locations in that domain.
+
+```yaml
+domains:
+  app.example.org:
+    oauth_url: https://proxy.auth.nexus.ethz.ch/oauth2/
+    locations:
+      - proxy:
+          uri: /
+          proto: http
+          upstream: app
+          path: /
+```
+
 #### `proxy` location
 
 The `proxy` location forwards the traffic arriving at the defined `uri` to `proto`://`upstream`/`path`. You can configure additional configuration parameters:
 
 - `disable_cache`: true or false, to add headers to this location to disable the browser cache. Default is false.
 - `auth`: To enable basic_authentication for this location. If configured you must add a list of `user`, `password` combinations.
+- `auth_request`: Optional URL/URI for nginx `auth_request` middleware. If you configure an internal URI (for example `/auth/check/`), nginx will use it directly. If you configure an absolute URL (for example `https://auth.example.org/check`), SMNRPX creates an internal helper location that proxies the auth subrequest to that URL. Responses `401` and `403` are treated as denied access.
 - `whitelist`: To only allow a configured list of network segments to access this location.
 - `custom`: To add custom configuration entries such as additional or different proxy headers.
 
@@ -310,6 +329,7 @@ locations:
           password: admin
         - user: user
           password: secret
+      auth_request: https://auth.example.org/check
       whitelist:
         - 127.0.0.1
       custom:
@@ -324,6 +344,7 @@ you want to serve if the uri `/api/static` is requested. There are additional co
 - `internal`: true or false, adds the `internal` clause to an alias location. This can be used to protect the file in this location from public access. Such files are only accessible by setting the `X-Accel-Redirect` header.
 - `try_files`: adds a `try_files` clause to the `alias` location.
 - `auth`: same as in the `proxy` location
+- `auth_request`: same behavior as in the `proxy` location
 
 ```yaml
 locations:
