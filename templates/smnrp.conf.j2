@@ -164,10 +164,13 @@ server {
     internal;
     proxy_pass_request_body off;
     proxy_set_header Content-Length "";
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-Uri $request_uri;
     proxy_set_header X-Original-Method $request_method;
     proxy_set_header X-Original-URI $request_uri;
-    proxy_set_header X-Original-Host $host;
-    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Original-Host $http_host;
+    proxy_set_header X-Forwarded-Host $http_host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_pass {{ oauth_base_url }}auth;
@@ -179,7 +182,10 @@ server {
 
   location /oauth2/ {
     proxy_pass {{ oauth_base_url }};
-    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Auth-Request-Redirect $scheme://$http_host$request_uri;
+    proxy_set_header X-Forwarded-Host $http_host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
   }
@@ -238,9 +244,7 @@ server {
     {% endif %}
     {% elif domain.oauth_url %}
     auth_request {{ oauth_auth_request_uri }};
-    {% if location.proxy.uri == '/' %}
     error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;
-    {% endif %}
     {% endif %}
     {% if location.proxy.disable_cache %}
     {{ security_headers(domain, include_cache_control=false) }}
@@ -301,9 +305,7 @@ server {
     {% endif %}
     {% elif domain.oauth_url %}
     auth_request {{ oauth_auth_request_uri }};
-    {% if location.alias.uri == '/' %}
     error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;
-    {% endif %}
     {% endif %}
     {% if location.alias.disable_cache %}
     {{ security_headers(domain, include_cache_control=false) }}
