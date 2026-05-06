@@ -276,7 +276,7 @@ The default root folder for each domain is located at `/web_root/<domain_name>`.
 A domain contains different `upstreams`, `locations` and additional configuration parameters:
 
 - `cert`: Can have the values `self-signed`, `own`, `letsencrypt` or not defined, to define how the certificate is generated. Default is through Let's Encrypt.
-- `csp`: The Content security policy. Default is the nginx default.
+- `csp`: The default Content Security Policy for this domain. If omitted, SMNRP*X* does not add a `Content-Security-Policy` header.
 - `proxy_buffer_size`: The proxy buffer size.
 - `client_max_body_size`: The client max body size.
 - `client_body_buffer_size`: The client body buffer size.
@@ -317,6 +317,7 @@ The `proxy` location forwards the traffic arriving at the defined `uri` to `prot
 - `auth_request`: Optional URL/URI for nginx `auth_request` middleware. If you configure an internal URI (for example `/auth/check/`), nginx will use it directly. If you configure an absolute URL (for example `https://auth.example.org/check`), SMNRPX creates an internal helper location that proxies the auth subrequest to that URL. Responses `401` and `403` are treated as denied access.
 - `whitelist`: To only allow a configured list of network segments to access this location.
 - `custom`: To add custom configuration entries such as additional or different proxy headers.
+- `csp`: Optional Content Security Policy for this proxy location. If configured, it replaces the domain-level `csp` for this location.
 
 ```yaml
 locations:
@@ -336,6 +337,21 @@ locations:
         - 127.0.0.1
       custom:
         - proxy_set_header Host $http_host
+```
+
+You can use a restrictive domain CSP and make a specific proxy location more permissive:
+
+```yaml
+domains:
+  app.example.org:
+    csp: default-src 'self'
+    locations:
+      - proxy:
+          uri: /app/
+          proto: http
+          upstream: app
+          path: /
+          csp: default-src 'self' https: data: blob: 'unsafe-inline'
 ```
 
 #### `alias` location
@@ -510,7 +526,7 @@ Here is an example:
 
 ### `csp`
 
-You can define the `Content-Security-Policy` header. If this is not defined, none is used. The following example shows the most secure one:
+You can define the default `Content-Security-Policy` header for a domain. If this is not defined, none is used. A `proxy` location can define its own `csp` to replace the domain default for that location. The following example shows the most secure one:
 
 ```yaml
 csp: default-src 'self' http: https: data: blob: 'unsafe-inline'
