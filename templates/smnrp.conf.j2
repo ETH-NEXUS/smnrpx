@@ -315,11 +315,11 @@ server {
     expires off;
     etag off;
     {% endif %}
-    {% if location.internal %}
+    {% if location.alias.internal %}
     internal;
     {% endif %}
     alias {{ location.alias.path }};
-    {% if location.try_files %}
+    {% if location.alias.try_files %}
     try_files $uri $uri/ /index.html;
     {% endif %}
     {% if location.alias.custom %}

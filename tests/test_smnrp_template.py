@@ -92,6 +92,32 @@ def test_alias_auth_request_external_url_uses_internal_helper_location():
     assert "auth_request /__smnrpx_auth_request_alias_0;" in rendered
 
 
+def test_alias_internal_and_try_files_are_read_from_alias_config():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+                "locations": [
+                    {
+                        "alias": {
+                            "uri": "/media/",
+                            "path": "/srv/media",
+                            "internal": True,
+                            "try_files": True,
+                        }
+                    }
+                ],
+            }
+        }
+    )
+
+    assert "location /media/ {" in rendered
+    assert "internal;" in rendered
+    assert "alias /srv/media;" in rendered
+    assert "try_files $uri $uri/ /index.html;" in rendered
+
+
 def test_oauth_url_external_applies_auth_request_to_all_locations():
     rendered = _render_smnrp_conf(
         {
