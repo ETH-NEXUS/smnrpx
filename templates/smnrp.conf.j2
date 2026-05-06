@@ -1,4 +1,4 @@
-{% macro security_headers(domain, include_cache_control=true) -%}
+{% macro security_headers(csp_value, include_cache_control=true) -%}
 add_header Strict-Transport-Security "max-age=31536000; includeSubdomains; preload";
 
 proxy_hide_header Referrer-Policy;
@@ -10,8 +10,8 @@ add_header X-Content-Type-Options nosniff;
 add_header Cache-Control no-cache="Set-Cookie";
 {% endif %}
 
-{% if domain.csp %}
-add_header Content-Security-Policy "{{ domain.csp }}" always;
+{% if csp_value %}
+add_header Content-Security-Policy "{{ csp_value }}" always;
 {% endif %}
 {%- endmacro %}
 
@@ -100,7 +100,7 @@ server {
   {% endif %}
 {% endif %} {# END if not domain.disable_https #}
 
-  {{ security_headers(domain) }}
+  {{ security_headers(domain.get("csp")) }}
 
   proxy_read_timeout 180s;
   proxy_buffers 8 32k;
@@ -247,12 +247,14 @@ server {
     error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;
     {% endif %}
     {% if location.proxy.disable_cache %}
-    {{ security_headers(domain, include_cache_control=false) }}
+    {{ security_headers(location.proxy.get("csp", domain.get("csp")), include_cache_control=false) }}
     add_header Last-Modified $date_gmt;
     add_header Cache-Control 'private no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';
     if_modified_since off;
     expires off;
     etag off;
+    {% elif location.proxy.csp %}
+    {{ security_headers(location.proxy.csp) }}
     {% endif %}
     {% if not location.proxy.disable_default_headers %}
     # proxy_redirect off;
@@ -308,7 +310,7 @@ server {
     error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;
     {% endif %}
     {% if location.alias.disable_cache %}
-    {{ security_headers(domain, include_cache_control=false) }}
+    {{ security_headers(domain.get("csp"), include_cache_control=false) }}
     add_header Last-Modified $date_gmt;
     add_header Cache-Control 'private no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';
     if_modified_since off;

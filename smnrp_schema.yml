@@ -39,6 +39,7 @@ proxy:
   proto: str(required=True)
   upstream: str(required=True)
   path: str(required=True)
+  csp: str(required=False)
   auth_request: str(required=False)
   whitelist: list(str(), required=False)
   auth: include('auth', required=False)
