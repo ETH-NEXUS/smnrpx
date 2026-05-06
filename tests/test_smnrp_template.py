@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 from box import Box
 from jinja2 import Environment, FileSystemLoader
@@ -12,6 +13,12 @@ def _render_smnrp_conf(domains: dict) -> str:
     )
     template = env.get_template("smnrp.conf.j2")
     return template.render(certrequest=False, domains=Box(domains))
+
+
+def _location_block(rendered: str, uri: str) -> str:
+    match = re.search(rf"  location {re.escape(uri)} \{{\n(?P<body>.*?)\n  \}}", rendered, re.S)
+    assert match is not None
+    return match.group("body")
 
 
 def test_proxy_auth_request_internal_uri_is_used_directly():
@@ -297,6 +304,127 @@ def test_disable_cache_keeps_security_headers_in_location_context():
     # disable_cache locations use the strict cache-control header and avoid duplicating the default one.
     assert rendered.count('add_header Cache-Control no-cache="Set-Cookie";') == 1
     assert "add_header Cache-Control 'private no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0';" in rendered
+
+
+def test_domain_csp_is_emitted_only_when_defined():
+    with_csp = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "disable_https": True,
+                "csp": "default-src 'self'",
+            }
+        }
+    )
+    without_csp = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "disable_https": True,
+            }
+        }
+    )
+
+    assert 'add_header Content-Security-Policy "default-src \'self\'" always;' in with_csp
+    assert "add_header Content-Security-Policy" not in without_csp
+
+
+def test_proxy_csp_is_emitted_inside_proxy_location():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "disable_https": True,
+                "upstreams": {"app": ["app:8000"]},
+                "locations": [
+                    {
+                        "proxy": {
+                            "uri": "/app/",
+                            "proto": "http",
+                            "upstream": "app",
+                            "path": "/",
+                            "csp": "default-src 'self' https: 'unsafe-inline'",
+                        }
+                    }
+                ],
+            }
+        }
+    )
+
+    location_block = _location_block(rendered, "/app/")
+
+    assert (
+        'add_header Content-Security-Policy "default-src \'self\' https: \'unsafe-inline\'" always;'
+        in location_block
+    )
+
+
+def test_proxy_csp_overrides_domain_csp_and_preserves_location_security_headers():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "disable_https": True,
+                "csp": "default-src 'self'",
+                "upstreams": {"app": ["app:8000"]},
+                "locations": [
+                    {
+                        "proxy": {
+                            "uri": "/app/",
+                            "proto": "http",
+                            "upstream": "app",
+                            "path": "/",
+                            "csp": "default-src 'self' https: data: 'unsafe-inline'",
+                        }
+                    }
+                ],
+            }
+        }
+    )
+
+    location_block = _location_block(rendered, "/app/")
+
+    assert rendered.count('add_header Content-Security-Policy "default-src \'self\'" always;') == 1
+    assert (
+        rendered.count(
+            'add_header Content-Security-Policy "default-src \'self\' https: data: \'unsafe-inline\'" always;'
+        )
+        == 1
+    )
+    assert 'add_header Content-Security-Policy "default-src \'self\'" always;' not in location_block
+    assert (
+        'add_header Content-Security-Policy "default-src \'self\' https: data: \'unsafe-inline\'" always;'
+        in location_block
+    )
+    assert 'add_header Strict-Transport-Security "max-age=31536000; includeSubdomains; preload";' in location_block
+    assert "add_header Referrer-Policy strict-origin-when-cross-origin;" in location_block
+    assert 'add_header X-Frame-Options "SAMEORIGIN";' in location_block
+    assert "add_header X-Content-Type-Options nosniff;" in location_block
+    assert 'add_header Cache-Control no-cache="Set-Cookie";' in location_block
+
+
+def test_no_csp_header_is_emitted_without_domain_or_proxy_csp():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "sans": [],
+                "disable_https": True,
+                "upstreams": {"api": ["api:8000"]},
+                "locations": [
+                    {
+                        "proxy": {
+                            "uri": "/api/",
+                            "proto": "http",
+                            "upstream": "api",
+                            "path": "/",
+                        }
+                    }
+                ],
+            }
+        }
+    )
+
+    assert "add_header Content-Security-Policy" not in rendered
 
 
 def test_absolute_redirect_can_be_disabled_per_domain():
