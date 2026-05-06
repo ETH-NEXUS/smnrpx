@@ -283,7 +283,8 @@ A domain contains different `upstreams`, `locations` and additional configuratio
 - `absolute_redirect`: true or false, to set nginx `absolute_redirect on|off` at server level. If omitted, nginx default behavior applies (on).
 - `allow_tls1.2`: true or false, if you want to support also tls1.2. Default only supports tls1.3
 - `disable_ocsp_stapling`: true or false, if you want to disable ocsp stapling. Default is false.
-- `oauth_url`: Optional oauth2-proxy base URL (for example `https://proxy.auth.nexus.ethz.ch/oauth2/`). If set, all `proxy` and `alias` locations get an auth check against `<oauth_url>/auth`. On `401` for the root location `/`, requests are redirected to `/oauth2/start?rd=<original_url>`.
+- `oauth_url`: Optional oauth2-proxy base URL (for example `https://proxy.auth.nexus.ethz.ch/oauth2/`). If set, all `proxy` and `alias` locations get an auth check against `<oauth_url>/auth`. On `401`, requests are redirected to `/oauth2/start?rd=<original_url>`.
+  The oauth2-proxy `redirect_url` must point back to the protected domain, for example `https://app.example.org/oauth2/callback`, and that exact callback URL must be allowed by the OAuth provider.
 
 ### `upstreams`
 

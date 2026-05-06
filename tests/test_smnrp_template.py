@@ -92,6 +92,32 @@ def test_alias_auth_request_external_url_uses_internal_helper_location():
     assert "auth_request /__smnrpx_auth_request_alias_0;" in rendered
 
 
+def test_alias_internal_and_try_files_are_read_from_alias_config():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+                "locations": [
+                    {
+                        "alias": {
+                            "uri": "/media/",
+                            "path": "/srv/media",
+                            "internal": True,
+                            "try_files": True,
+                        }
+                    }
+                ],
+            }
+        }
+    )
+
+    assert "location /media/ {" in rendered
+    assert "internal;" in rendered
+    assert "alias /srv/media;" in rendered
+    assert "try_files $uri $uri/ /index.html;" in rendered
+
+
 def test_oauth_url_external_applies_auth_request_to_all_locations():
     rendered = _render_smnrp_conf(
         {
@@ -117,6 +143,12 @@ def test_oauth_url_external_applies_auth_request_to_all_locations():
                             "path": "/",
                         }
                     },
+                    {
+                        "alias": {
+                            "uri": "/files/",
+                            "path": "/srv/files",
+                        }
+                    },
                 ],
             }
         }
@@ -124,12 +156,20 @@ def test_oauth_url_external_applies_auth_request_to_all_locations():
 
     assert "location = /__smnrpx_oauth_auth {" in rendered
     assert "proxy_pass https://proxy.auth.nexus.ethz.ch/oauth2/auth;" in rendered
+    assert "proxy_set_header Host $http_host;" in rendered
+    assert "proxy_set_header X-Real-IP $remote_addr;" in rendered
+    assert "proxy_set_header X-Forwarded-Uri $request_uri;" in rendered
+    assert "proxy_set_header X-Forwarded-Host $http_host;" in rendered
     assert "location /oauth2/ {" in rendered
     assert "proxy_pass https://proxy.auth.nexus.ethz.ch/oauth2/;" in rendered
-    assert rendered.count("auth_request /__smnrpx_oauth_auth;") == 2
+    assert (
+        "proxy_set_header X-Auth-Request-Redirect $scheme://$http_host$request_uri;"
+        in rendered
+    )
+    assert rendered.count("auth_request /__smnrpx_oauth_auth;") == 3
     assert (
         rendered.count("error_page 401 =302 /oauth2/start?rd=$scheme://$http_host$request_uri;")
-        == 1
+        == 3
     )
 
 
