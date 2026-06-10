@@ -1,8 +1,8 @@
-FROM nginx:1.29
+FROM nginx:1.31.1
 
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1 
-ENV PIP_NO_CACHE_DIR=1
-ENV PYTHONUNBUFFERED=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+  PIP_NO_CACHE_DIR=1 \
+  PYTHONUNBUFFERED=1
 
 # All following commands are done as root
 USER root
@@ -12,29 +12,28 @@ USER root
 # are persistent
 VOLUME /etc/letsencrypt
 
-# Install the requirements
-RUN apt-get update && apt-get install -y \
-  python3 \
-  python3-pip \
-  certbot \
-  python3-certbot-nginx \
-  inotify-tools \
-  apache2-utils
+# Install OS requirements and clean apt metadata in the same layer.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    apache2-utils \
+    certbot \
+    inotify-tools \
+    libcap2-bin \
+    python3 \
+    python3-certbot-nginx \
+    python3-pip \
+    vim \
+  && setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx \
+  && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /var/tmp/*
 
-# Support net bind capability
-RUN apt-get install -y libcap2-bin \
- && setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx
-
-# Install debugging tools
-RUN apt-get install -y \
-  vim \
-  procps
-  
-# Clean up the apt cache
-RUN apt-get clean autoclean && apt-get autoremove -y && rm -rf /var/lib/{apt,dpkg,cache,log}/
-
-# Cerate the web root directory
-RUN mkdir -p /web_root
+# Create runtime directories
+RUN mkdir -p \
+  /etc/letsencrypt \
+  /usr/share/nginx/html/error \
+  /var/lib/letsencrypt \
+  /var/log/nginx \
+  /var/www/certbot \
+  /web_root
 
 # Copy an initial index html to the webroot
 # normaly you would mount a directory
@@ -44,23 +43,13 @@ COPY ./nginx/background.jpg /usr/share/nginx/background.jpg
 COPY ./nginx/favicon.ico /usr/share/nginx/favicon.ico
 COPY ./nginx/dhparams.pem /usr/share/nginx/dhparams.pem
 
-# Create the webroot for certbot
-RUN mkdir -p /var/www/certbot
-
-# Create letsencrypt directory
-RUN mkdir -p /etc/letsencrypt
-
 # Copy the errorpages
-RUN mkdir -p /usr/share/nginx/html/error
 COPY ./nginx/errorpages/* /usr/share/nginx/html/error/.
 
-# Add additional required folders
-RUN mkdir -p /var/lib/letsencrypt
-RUN mkdir -p /var/log/nginx
-
 # Install python dependencies
-COPY ./pyproject.toml /tmp/pyproject.toml
-RUN pip install --break-system-packages --prefer-binary --root-user-action ignore /tmp
+COPY ./pyproject.toml /tmp/smnrpx/pyproject.toml
+RUN pip install --break-system-packages --prefer-binary --root-user-action ignore /tmp/smnrpx \
+  && rm -rf /tmp/smnrpx /root/.cache/pip
 
 # Create an smnrp user and group
 RUN groupadd --gid 1000 smnrp \
