@@ -22,7 +22,6 @@ RUN apt-get update \
     python3 \
     python3-certbot-nginx \
     python3-pip \
-    vim \
   && setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /var/tmp/*
 
