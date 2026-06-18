@@ -8,6 +8,8 @@ def get_grouped_domains(cfg: Box):
     cert_domain_specs = []
     grouped_domains = {}
     for domain_name, domain in cfg.domains.items():
+        if domain.get("disable_https", False):
+            continue
         if "cert" not in domain or domain.cert == "letsencrypt":
             cert_domain_specs.append({"domain": domain_name, "type": "vhost"})
             if "sans" in domain:

@@ -1,6 +1,8 @@
 import json
+from pathlib import Path
 
 import pytest
+import yamale
 from box import Box
 
 import entrypoint
@@ -60,6 +62,36 @@ def test_get_grouped_domains_ignores_invalid_domains(capsys):
     assert "not-a-valid-domain" in out
 
 
+def test_get_grouped_domains_skips_disabled_https_domains():
+    cfg = Box(
+        {
+            "domains": {
+                "default-cert.example.org": {
+                    "disable_https": True,
+                    "sans": ["www.example.org"],
+                },
+                "explicit-letsencrypt.test.io": {
+                    "cert": "letsencrypt",
+                    "disable_https": True,
+                    "sans": ["www.test.io"],
+                },
+                "secure.example.net": {
+                    "sans": ["www.example.net"],
+                },
+            }
+        }
+    )
+
+    grouped = entrypoint.get_grouped_domains(cfg)
+
+    assert grouped == {
+        "example.net": [
+            {"domain": "secure.example.net", "type": "vhost"},
+            {"domain": "www.example.net", "type": "san"},
+        ]
+    }
+
+
 def test_apply_defaults_sets_missing_and_preserves_existing_per_domain():
     cfg = Box({"domains": {"api.example.org": {"server_tokens": "on", "allow_tls1.2": True}}})
     applied = entrypoint.apply_defaults(cfg)
@@ -73,6 +105,19 @@ def test_apply_defaults_sets_missing_and_preserves_existing_per_domain():
             assert domain[key] == value
 
     assert "server_tokens" not in applied
+
+
+def test_schema_accepts_large_client_header_buffers():
+    schema = yamale.make_schema(str(Path(__file__).resolve().parents[1] / "smnrp_schema.yml"))
+    data = yamale.make_data(
+        content="""
+domains:
+  api.example.org:
+    large_client_header_buffers: 4 16k
+"""
+    )
+
+    yamale.validate(schema, data)
 
 
 def test_compute_domain_hash_is_stable_for_san_order():

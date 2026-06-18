@@ -5,20 +5,90 @@ from box import Box
 from jinja2 import Environment, FileSystemLoader
 
 
-def _render_smnrp_conf(domains: dict) -> str:
+def _render_smnrp_conf(domains: dict, certrequest: bool = False) -> str:
     env = Environment(
         loader=FileSystemLoader(str(Path(__file__).resolve().parents[1] / "templates")),
         trim_blocks=True,
         lstrip_blocks=True,
     )
     template = env.get_template("smnrp.conf.j2")
-    return template.render(certrequest=False, domains=Box(domains))
+    return template.render(certrequest=certrequest, domains=Box(domains))
 
 
 def _location_block(rendered: str, uri: str) -> str:
     match = re.search(rf"  location {re.escape(uri)} \{{\n(?P<body>.*?)\n  \}}", rendered, re.S)
     assert match is not None
     return match.group("body")
+
+
+def test_certrequest_skips_disabled_https_domains():
+    rendered = _render_smnrp_conf(
+        {
+            "http-only.example.org": {
+                "disable_https": True,
+                "sans": [],
+                "upstreams": {},
+                "locations": [],
+            }
+        },
+        certrequest=True,
+    )
+
+    assert "http-only.example.org" not in rendered
+    assert "server {" not in rendered
+
+
+def test_certrequest_mixed_domains_only_renders_https_enabled_domains():
+    rendered = _render_smnrp_conf(
+        {
+            "http-only.example.org": {
+                "disable_https": True,
+                "sans": [],
+                "upstreams": {},
+                "locations": [],
+            },
+            "secure.example.org": {
+                "disable_https": False,
+                "sans": [],
+                "upstreams": {},
+                "locations": [],
+            },
+        },
+        certrequest=True,
+    )
+
+    assert "http-only.example.org" not in rendered
+    assert "server_name secure.example.org ;" in rendered
+    assert "location /.well-known/acme-challenge/ {" in rendered
+    assert rendered.count("server {") == 1
+
+
+def test_large_client_header_buffers_default_is_rendered():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+            }
+        }
+    )
+
+    assert "large_client_header_buffers 2 1k;" in rendered
+
+
+def test_large_client_header_buffers_can_be_configured_per_domain():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "sans": [],
+                "large_client_header_buffers": "4 16k",
+            }
+        }
+    )
+
+    assert "large_client_header_buffers 4 16k;" in rendered
+    assert "large_client_header_buffers 2 1k;" not in rendered
 
 
 def test_proxy_auth_request_internal_uri_is_used_directly():

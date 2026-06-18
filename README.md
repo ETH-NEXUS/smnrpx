@@ -111,6 +111,7 @@ domains:
     proxy_buffer_size: 32k
     client_max_body_size: 1m
     client_body_buffer_size: 1k
+    large_client_header_buffers: 2 1k
     allow_tls1.2: true
     disable_ocsp_stapling: true
 
@@ -280,6 +281,7 @@ A domain contains different `upstreams`, `locations` and additional configuratio
 - `proxy_buffer_size`: The proxy buffer size.
 - `client_max_body_size`: The client max body size.
 - `client_body_buffer_size`: The client body buffer size.
+- `large_client_header_buffers`: The large client header buffers setting.
 - `absolute_redirect`: true or false, to set nginx `absolute_redirect on|off` at server level. If omitted, nginx default behavior applies (on).
 - `allow_tls1.2`: true or false, if you want to support also tls1.2. Default only supports tls1.3
 - `disable_ocsp_stapling`: true or false, if you want to disable ocsp stapling. Default is false.
@@ -738,7 +740,7 @@ client_body_buffer_size: 1k
 
 ### `large_client_header_buffers`
 
-Set the `large_client_header_buffers` parameter for this server, default is `2 1k`. Nginx default would be `4 8k`
+Set the `large_client_header_buffers` parameter for this server, default is `2 1k`. Nginx default would be `4 8k`.
 
 ```bash
 large_client_header_buffers: 2 1k
