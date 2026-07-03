@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Keep the pinned nginx base-image digest fresh.
+  # The Dockerfile pins `nginx:1@sha256:...` (major version fixed), so Dependabot
+  # bumps the digest whenever a new 1.x minor/patch image is published, opening a
+  # PR with the updated sha256. The `1` tag never changes, so only the digest moves.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "[DEP]"
+
+  # Keep the Python dependencies (pyproject.toml) up to date.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "[DEP]"
+
+  # Keep the GitHub Actions used in workflows up to date.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "[DEP]"

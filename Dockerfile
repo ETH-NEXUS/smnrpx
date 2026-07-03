@@ -1,4 +1,8 @@
-FROM nginx:1.31.1
+# Pinned by digest for reproducible builds.
+# The tag fixes only the major version (nginx 1.x); the digest pins the exact
+# image. Dependabot keeps the digest fresh as 1.x minor/patch releases land
+# (see .github/dependabot.yml and the README).
+FROM nginx:1@sha256:ec4ed8b5299e5e90694af7750eb6dffd2627317d30544d056b0371f8082f7bce
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
   PIP_NO_CACHE_DIR=1 \
@@ -13,14 +17,15 @@ USER root
 VOLUME /etc/letsencrypt
 
 # Install OS requirements and clean apt metadata in the same layer.
+#   apache2-utils -> htpasswd (basic-auth files)
+#   certbot       -> Let's Encrypt certificate requests/renewals (webroot)
+#   python3/pip   -> run the smnrpx entrypoint
+# (openssl for dhparams/self-signed certs is already provided by the base image)
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     apache2-utils \
     certbot \
-    inotify-tools \
-    libcap2-bin \
     python3 \
-    python3-certbot-nginx \
     python3-pip \
   && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /var/tmp/*
 
