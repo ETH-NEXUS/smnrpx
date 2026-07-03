@@ -33,7 +33,7 @@ convention = "pep257"
 [dependency-groups]
 dev = [
     "djlint>=1.36.4",
-    "pytest>=8.4.2",
+    "pytest>=9.1.1",
 ]
 
 [tool.pytest.ini_options]
