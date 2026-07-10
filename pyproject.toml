@@ -32,7 +32,7 @@ convention = "pep257"
 
 [dependency-groups]
 dev = [
-    "djlint>=1.40.2",
+    "djlint>=1.40.4",
     "pytest>=9.1.1",
 ]
 
