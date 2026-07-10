@@ -6,16 +6,19 @@ from box import Box
 from yamale.yamale_error import YamaleError
 
 from smnrpx.constants import DEFAULTS, ENV_VAR_PATTERN
+from smnrpx.domains import get_effective_sans
 
 
 def apply_defaults(cfg: Box) -> Box:
     if "domains" not in cfg:
         return cfg
 
-    for domain in cfg.domains.values():
+    for domain_name, domain in cfg.domains.items():
         for key, value in DEFAULTS.items():
             if key not in domain:
                 domain[key] = value
+        if domain.get("redirect_www", False):
+            domain["sans"] = get_effective_sans(domain_name, domain)
     return cfg
 
 

@@ -4,15 +4,22 @@ import re
 from box import Box
 from jinja2 import Environment, FileSystemLoader
 
+from smnrpx.configuration import apply_defaults
 
-def _render_smnrp_conf(domains: dict, certrequest: bool = False) -> str:
+
+def _render_smnrp_conf(
+    domains: dict, certrequest: bool = False, with_defaults: bool = False
+) -> str:
+    cfg = Box({"domains": domains})
+    if with_defaults:
+        cfg = apply_defaults(cfg)
     env = Environment(
         loader=FileSystemLoader(str(Path(__file__).resolve().parents[1] / "templates")),
         trim_blocks=True,
         lstrip_blocks=True,
     )
     template = env.get_template("smnrp.conf.j2")
-    return template.render(certrequest=certrequest, domains=Box(domains))
+    return template.render(certrequest=certrequest, domains=cfg.domains)
 
 
 def _location_block(rendered: str, uri: str) -> str:
@@ -58,7 +65,7 @@ def test_certrequest_mixed_domains_only_renders_https_enabled_domains():
     )
 
     assert "http-only.example.org" not in rendered
-    assert "server_name secure.example.org ;" in rendered
+    assert "server_name secure.example.org;" in rendered
     assert "location /.well-known/acme-challenge/ {" in rendered
     assert rendered.count("server {") == 1
 
@@ -524,3 +531,50 @@ def test_absolute_redirect_can_be_enabled_explicitly_per_domain():
     )
 
     assert "absolute_redirect on;" in rendered
+
+
+def test_redirect_www_adds_generated_server_name_and_https_redirect():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "redirect_www": True,
+            }
+        },
+        with_defaults=True,
+    )
+
+    assert "server_name example.org www.example.org;" in rendered
+    assert "if ($host = www.example.org) {" in rendered
+    assert "return 301 https://example.org$request_uri;" in rendered
+
+
+def test_redirect_www_uses_exposed_https_port_in_redirect():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "redirect_www": True,
+                "ports": {
+                    "exposed_https": 8443,
+                },
+            }
+        },
+        with_defaults=True,
+    )
+
+    assert "return 301 https://example.org:8443$request_uri;" in rendered
+
+
+def test_redirect_www_uses_http_when_https_is_disabled():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "redirect_www": True,
+                "disable_https": True,
+            }
+        },
+        with_defaults=True,
+    )
+
+    assert "server_name example.org www.example.org;" in rendered
+    assert "return 301 http://example.org$request_uri;" in rendered
+    assert "return 301 https://example.org$request_uri;" not in rendered

@@ -92,6 +92,28 @@ def test_get_grouped_domains_skips_disabled_https_domains():
     }
 
 
+def test_get_grouped_domains_includes_redirect_www_domain_as_san():
+    cfg = Box(
+        {
+            "domains": {
+                "example.org": {
+                    "redirect_www": True,
+                    "sans": [],
+                },
+            }
+        }
+    )
+
+    grouped = entrypoint.get_grouped_domains(cfg)
+
+    assert grouped == {
+        "example.org": [
+            {"domain": "example.org", "type": "vhost"},
+            {"domain": "www.example.org", "type": "san"},
+        ]
+    }
+
+
 def test_apply_defaults_sets_missing_and_preserves_existing_per_domain():
     cfg = Box({"domains": {"api.example.org": {"server_tokens": "on", "allow_tls1.2": True}}})
     applied = entrypoint.apply_defaults(cfg)
@@ -107,6 +129,14 @@ def test_apply_defaults_sets_missing_and_preserves_existing_per_domain():
     assert "server_tokens" not in applied
 
 
+def test_apply_defaults_adds_redirect_www_domain_to_sans():
+    cfg = Box({"domains": {"example.org": {"redirect_www": True}}})
+
+    applied = entrypoint.apply_defaults(cfg)
+
+    assert applied.domains["example.org"]["sans"] == ["www.example.org"]
+
+
 def test_schema_accepts_large_client_header_buffers():
     schema = yamale.make_schema(str(Path(__file__).resolve().parents[1] / "smnrp_schema.yml"))
     data = yamale.make_data(
@@ -114,6 +144,19 @@ def test_schema_accepts_large_client_header_buffers():
 domains:
   api.example.org:
     large_client_header_buffers: 4 16k
+"""
+    )
+
+    yamale.validate(schema, data)
+
+
+def test_schema_accepts_redirect_www():
+    schema = yamale.make_schema(str(Path(__file__).resolve().parents[1] / "smnrp_schema.yml"))
+    data = yamale.make_data(
+        content="""
+domains:
+  example.org:
+    redirect_www: true
 """
     )
 

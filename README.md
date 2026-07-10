@@ -93,6 +93,8 @@ domains:
     # Subject alternative names (SAN) (other names for the **same** domain)
     sans:
       - www.dom.org
+    # Redirect www.dom.org to dom.org and include www.dom.org in the certificate
+    redirect_www: true
     # Upstreams
     upstreams:
       # Name of the upstream (freely eligible)
@@ -283,6 +285,7 @@ A domain contains different `upstreams`, `locations` and additional configuratio
 - `client_body_buffer_size`: The client body buffer size.
 - `large_client_header_buffers`: The large client header buffers setting.
 - `absolute_redirect`: true or false, to set nginx `absolute_redirect on|off` at server level. If omitted, nginx default behavior applies (on).
+- `redirect_www`: true or false, to redirect `www.<domain_name>` to `<domain_name>`. When enabled, SMNRP*X* also includes `www.<domain_name>` in the certificate SANs.
 - `allow_tls1.2`: true or false, if you want to support also tls1.2. Default only supports tls1.3
 - `disable_ocsp_stapling`: true or false, if you want to disable ocsp stapling. Default is false.
 - `oauth_url`: Optional oauth2-proxy base URL (for example `https://proxy.auth.nexus.ethz.ch/oauth2/`). If set, all `proxy` and `alias` locations get an auth check against `<oauth_url>/auth`. On `401`, requests are redirected to `/oauth2/start?rd=<original_url>`.
