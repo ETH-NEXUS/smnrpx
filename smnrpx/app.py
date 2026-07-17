@@ -159,11 +159,12 @@ def _render_final_smnrp_conf(cfg: Box, env: Environment):
         config_file.write(template.render(certrequest=False, domains=cfg.domains))
 
 
-def _exec_foreground_process():
-    pid = fork()
-    if pid == 0:
-        cert_renew()
-        return
+def _exec_foreground_process(renew_certificates: bool):
+    if renew_certificates:
+        pid = fork()
+        if pid == 0:
+            cert_renew()
+            return
 
     args = argv[1:]
     if args:
@@ -188,12 +189,13 @@ def main():
 
     _render_nginx_config(cfg, env)
 
+    grouped_domains = get_grouped_domains(cfg)
     nginx = prepare_nginx_for_cert_request(cfg, env)
-    handle_cert_request(get_grouped_domains(cfg))
+    handle_cert_request(grouped_domains)
     kill_nginx(nginx)
 
     _process_domain_certificates(cfg, env)
     _render_final_smnrp_conf(cfg, env)
     check_nginx_syntax()
 
-    _exec_foreground_process()
+    _exec_foreground_process(renew_certificates=bool(grouped_domains))

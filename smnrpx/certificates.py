@@ -9,7 +9,7 @@ from smnrpx.hashing import compute_certificate_request_hash, get_domain_hash, st
 
 
 def cert_renew():
-    print("🪪 Starting cerbot renewal process")
+    print("🪪 Starting certbot renewal process")
     while True:
         sleep(CERT_RENEW_TIMEOUT)
         print("🪪 Renew certificates")

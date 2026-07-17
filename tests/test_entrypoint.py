@@ -6,6 +6,7 @@ import yamale
 from box import Box
 
 import entrypoint
+from smnrpx import app
 from smnrpx import certificates
 from smnrpx import configuration
 from smnrpx import nginx_runtime
@@ -90,6 +91,19 @@ def test_get_grouped_domains_skips_disabled_https_domains():
             {"domain": "www.example.net", "type": "san"},
         ]
     }
+
+
+def test_get_grouped_domains_is_empty_for_self_signed_and_own_certificates():
+    cfg = Box(
+        {
+            "domains": {
+                "internal.example.org": {"cert": "self-signed"},
+                "custom.example.net": {"cert": "own"},
+            }
+        }
+    )
+
+    assert entrypoint.get_grouped_domains(cfg) == {}
 
 
 def test_get_grouped_domains_includes_redirect_www_domain_as_san():
@@ -429,6 +443,33 @@ def test_handle_cert_request_cleans_up_on_certbot_failure(monkeypatch):
         entrypoint.handle_cert_request(grouped_domains)
 
     assert removed_dirs == ["/etc/letsencrypt/live/api.example.org"]
+
+
+def test_exec_foreground_process_does_not_start_certbot_without_letsencrypt_domains(
+    monkeypatch,
+):
+    calls = []
+
+    monkeypatch.setattr(app, "fork", lambda: calls.append("fork"))
+    monkeypatch.setattr(app, "cert_renew", lambda: calls.append("cert_renew"))
+    monkeypatch.setattr(app, "execvp", lambda *args: calls.append(args))
+
+    app._exec_foreground_process(renew_certificates=False)
+
+    assert "fork" not in calls
+    assert "cert_renew" not in calls
+    assert calls == [("nginx", ["nginx", "-g", "daemon off;"])]
+
+
+def test_exec_foreground_process_starts_certbot_for_letsencrypt_domains(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(app, "fork", lambda: 0)
+    monkeypatch.setattr(app, "cert_renew", lambda: calls.append("cert_renew"))
+
+    app._exec_foreground_process(renew_certificates=True)
+
+    assert calls == ["cert_renew"]
 
 
 def test_remove_default_nginx_conf_removes_existing_file(tmp_path):
