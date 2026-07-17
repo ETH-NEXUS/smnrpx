@@ -3,6 +3,22 @@ from box import Box
 from smnrpx.constants import DOMAIN_REGEX
 
 
+def get_www_redirect_domain(domain_name: str, domain) -> str | None:
+    if not domain.get("redirect_www", False):
+        return None
+    if domain_name.startswith("www."):
+        return None
+    return f"www.{domain_name}"
+
+
+def get_effective_sans(domain_name: str, domain) -> list[str]:
+    sans = list(domain.get("sans", []) or [])
+    www_redirect_domain = get_www_redirect_domain(domain_name, domain)
+    if www_redirect_domain and www_redirect_domain not in sans:
+        sans.append(www_redirect_domain)
+    return sans
+
+
 def get_grouped_domains(cfg: Box):
     # Collect all LetsEncrypt vhosts and SANs, grouped by main domain.
     cert_domain_specs = []
@@ -12,9 +28,8 @@ def get_grouped_domains(cfg: Box):
             continue
         if "cert" not in domain or domain.cert == "letsencrypt":
             cert_domain_specs.append({"domain": domain_name, "type": "vhost"})
-            if "sans" in domain:
-                for san in domain.sans:
-                    cert_domain_specs.append({"domain": san, "type": "san"})
+            for san in get_effective_sans(domain_name, domain):
+                cert_domain_specs.append({"domain": san, "type": "san"})
 
     main = None
     for domain_spec in cert_domain_specs:

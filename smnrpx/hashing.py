@@ -2,10 +2,12 @@ import hashlib
 import json
 from pathlib import Path
 
+from smnrpx.domains import get_effective_sans
+
 
 def _stable_signature(domain_name: str, domain) -> str:
     # Sort SANs so ordering in YAML doesn't change the hash.
-    sans_norm = sorted(str(s).strip() for s in (domain.get("sans", [])))
+    sans_norm = sorted(str(s).strip() for s in get_effective_sans(domain_name, domain))
     cert = domain.cert if "cert" in domain else ""
     return f"{domain_name}|{cert}|{json.dumps(sans_norm, separators=(',', ':'), ensure_ascii=False)}"
 
