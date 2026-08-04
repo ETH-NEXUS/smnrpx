@@ -1,5 +1,6 @@
+import signal
 import subprocess
-from os import environ, execvp, fork, makedirs, path, remove
+from os import _exit, environ, execvp, fork, makedirs, path, remove
 from pathlib import Path
 from sys import argv
 
@@ -159,11 +160,17 @@ def _render_final_smnrp_conf(cfg: Box, env: Environment):
         config_file.write(template.render(certrequest=False, domains=cfg.domains))
 
 
-def _exec_foreground_process():
-    pid = fork()
-    if pid == 0:
-        cert_renew()
-        return
+def _exec_foreground_process(renew_certificates: bool):
+    if renew_certificates:
+        pid = fork()
+        if pid == 0:
+            cert_renew()
+            _exit(0)
+        # We're about to exec over ourselves (PID 1 in the container), so we can
+        # never wait() on the renewal child again. Ignoring SIGCHLD makes the
+        # kernel auto-reap it instead, and that disposition survives execvp().
+        # Nginx will also spawn children, but it has its own SIGCHLD handler to reap them overwriting this one, so we don't need to worry about them.
+        signal.signal(signal.SIGCHLD, signal.SIG_IGN)
 
     args = argv[1:]
     if args:
@@ -188,12 +195,13 @@ def main():
 
     _render_nginx_config(cfg, env)
 
+    grouped_domains = get_grouped_domains(cfg)
     nginx = prepare_nginx_for_cert_request(cfg, env)
-    handle_cert_request(get_grouped_domains(cfg))
+    handle_cert_request(grouped_domains)
     kill_nginx(nginx)
 
     _process_domain_certificates(cfg, env)
     _render_final_smnrp_conf(cfg, env)
     check_nginx_syntax()
 
-    _exec_foreground_process()
+    _exec_foreground_process(renew_certificates=bool(grouped_domains))
