@@ -450,6 +450,7 @@ def test_exec_foreground_process_does_not_start_certbot_without_letsencrypt_doma
 ):
     calls = []
 
+    monkeypatch.setattr(app, "argv", ["entrypoint.py"])
     monkeypatch.setattr(app, "fork", lambda: calls.append("fork"))
     monkeypatch.setattr(app, "cert_renew", lambda: calls.append("cert_renew"))
     monkeypatch.setattr(app, "execvp", lambda *args: calls.append(args))
@@ -464,12 +465,38 @@ def test_exec_foreground_process_does_not_start_certbot_without_letsencrypt_doma
 def test_exec_foreground_process_starts_certbot_for_letsencrypt_domains(monkeypatch):
     calls = []
 
+    def fake_exit(code):
+        calls.append(("_exit", code))
+        # os._exit() never returns; SystemExit stands in for that in the test.
+        raise SystemExit(code)
+
+    monkeypatch.setattr(app, "argv", ["entrypoint.py"])
     monkeypatch.setattr(app, "fork", lambda: 0)
     monkeypatch.setattr(app, "cert_renew", lambda: calls.append("cert_renew"))
+    monkeypatch.setattr(app, "_exit", fake_exit)
+    monkeypatch.setattr(app, "execvp", lambda *args: calls.append(args))
+
+    with pytest.raises(SystemExit, match="0"):
+        app._exec_foreground_process(renew_certificates=True)
+
+    assert calls == ["cert_renew", ("_exit", 0)]
+
+
+def test_exec_foreground_process_reaps_renewal_child_in_parent(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(app, "argv", ["entrypoint.py"])
+    monkeypatch.setattr(app, "fork", lambda: 4242)
+    monkeypatch.setattr(app, "cert_renew", lambda: calls.append("cert_renew"))
+    monkeypatch.setattr(
+        app.signal, "signal", lambda sig, handler: calls.append((sig, handler))
+    )
+    monkeypatch.setattr(app, "execvp", lambda *args: calls.append(args))
 
     app._exec_foreground_process(renew_certificates=True)
 
-    assert calls == ["cert_renew"]
+    assert "cert_renew" not in calls
+    assert (app.signal.SIGCHLD, app.signal.SIG_IGN) in calls
 
 
 def test_remove_default_nginx_conf_removes_existing_file(tmp_path):
