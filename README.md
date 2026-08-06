@@ -641,7 +641,11 @@ In case you want to chain SMNRP*X* instances on the same host you need to config
 
 - `network_mode` to `host`
 - omit the `ports` configuration and
-- add the `NET_BIND_SERVICE` capability using `cap_add`
+- use the `-net-bind` image variant, which grants nginx the
+  `CAP_NET_BIND_SERVICE` file capability
+
+Every versioned release publishes a matching variant, for example
+`ethnexus/smnrpx:3` and `ethnexus/smnrpx:3-net-bind`.
 
 ```yaml
 volumes:
@@ -649,13 +653,11 @@ volumes:
   log_data:
 services:
   ws:
-    image: ethnexus/smnrpx
+    image: ethnexus/smnrpx:3-net-bind
     volumes:
       - smnrp_data:/etc/letsencrypt
     ...
     network_mode: host
-    cap_add:
-      - NET_BIND_SERVICE
 ```
 
 ## Maintenance mode
