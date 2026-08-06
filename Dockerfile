@@ -87,3 +87,17 @@ USER smnrp
 
 # Start the entrypoint
 ENTRYPOINT [ "/entrypoint.py" ]
+
+# Variant for host networking, where the host's privileged-port restrictions
+# apply. The regular image intentionally remains unchanged.
+FROM base AS net-bind
+
+USER root
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libcap2-bin \
+  && setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx \
+  && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /var/tmp/*
+USER smnrp
+
+# Keep an unprivileged, capability-free image as the default build target.
+FROM base AS standard
