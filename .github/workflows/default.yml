@@ -29,6 +29,19 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
+      - name: Docker meta (NET_BIND_SERVICE variant)
+        id: meta-net-bind
+        uses: docker/metadata-action@v6
+        with:
+          images: |
+            ethnexus/smnrpx
+          flavor: |
+            suffix=-net-bind,onlatest=true
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
@@ -42,10 +55,20 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          target: standard
           push: true
           # tags: ethnexus/smnrpx:latest,ethnexus/smnrpx:1.0.0
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+      - name: Build and push NET_BIND_SERVICE variant
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: net-bind
+          push: true
+          tags: ${{ steps.meta-net-bind.outputs.tags }}
+          labels: ${{ steps.meta-net-bind.outputs.labels }}
           platforms: linux/amd64,linux/arm64
 
   PushContainerReadme:
