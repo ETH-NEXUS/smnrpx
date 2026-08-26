@@ -4,7 +4,12 @@ from os import path
 from smnrpx.app import main
 from smnrpx.assets import populate_if_not_exists
 from smnrpx.certificates import cert_renew, create_dhparams, handle_cert_request
-from smnrpx.configuration import apply_defaults, check_smnrp_config, expand_env_vars
+from smnrpx.configuration import (
+    apply_defaults,
+    check_smnrp_config,
+    drop_unresolved_domains,
+    expand_env_vars,
+)
 from smnrpx.constants import (
     CERT_RENEW_TIMEOUT,
     DEFAULTS,
@@ -17,7 +22,7 @@ from smnrpx.constants import (
     SMNRP_CONFIG,
     SMNRP_NGINX_CONFIG,
 )
-from smnrpx.domains import get_grouped_domains
+from smnrpx.domains import get_effective_sans, get_grouped_domains, get_redirect_hosts
 from smnrpx.hashing import compute_domain_hash, get_domain_hash, store_domain_hash
 from smnrpx.nginx_runtime import check_nginx_syntax, kill_nginx, prepare_nginx_for_cert_request
 
@@ -41,7 +46,10 @@ __all__ = [
     "cert_renew",
     "create_dhparams",
     "apply_defaults",
+    "drop_unresolved_domains",
     "get_grouped_domains",
+    "get_effective_sans",
+    "get_redirect_hosts",
     "prepare_nginx_for_cert_request",
     "kill_nginx",
     "handle_cert_request",

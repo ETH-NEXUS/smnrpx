@@ -10,7 +10,12 @@ from jinja2 import Environment, FileSystemLoader
 
 from smnrpx.assets import populate_if_not_exists
 from smnrpx.certificates import cert_renew, create_dhparams, handle_cert_request
-from smnrpx.configuration import apply_defaults, check_smnrp_config, expand_env_vars
+from smnrpx.configuration import (
+    apply_defaults,
+    check_smnrp_config,
+    drop_unresolved_domains,
+    expand_env_vars,
+)
 from smnrpx.constants import (
     LIVE,
     NGINX_CONFIG_BASE,
@@ -57,6 +62,7 @@ def _resolve_config_path() -> str:
 def _load_config(config_path: str) -> Box:
     with open(config_path, encoding="utf-8") as config_file:
         config = expand_env_vars(yaml.safe_load(config_file))
+    config = drop_unresolved_domains(config)
     check_smnrp_config(config)
     return apply_defaults(Box(config))
 

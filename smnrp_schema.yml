@@ -10,6 +10,7 @@ domain:
 
   disable_https: bool(required=False)
   redirect_www: bool(required=False)
+  redirect_from: list(str(), required=False)
   ports: include('ports', required=False)
 
   csp: str(required=False)
