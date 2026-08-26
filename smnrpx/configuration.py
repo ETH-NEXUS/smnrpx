@@ -6,7 +6,7 @@ from box import Box
 from yamale.yamale_error import YamaleError
 
 from smnrpx.constants import DEFAULTS, ENV_VAR_PATTERN
-from smnrpx.domains import get_effective_sans
+from smnrpx.domains import get_effective_sans, get_redirect_hosts
 
 
 def apply_defaults(cfg: Box) -> Box:
@@ -17,9 +17,43 @@ def apply_defaults(cfg: Box) -> Box:
         for key, value in DEFAULTS.items():
             if key not in domain:
                 domain[key] = value
-        if domain.get("redirect_www", False):
+        redirect_hosts = get_redirect_hosts(domain_name, domain)
+        if redirect_hosts:
+            domain["redirect_hosts"] = redirect_hosts
             domain["sans"] = get_effective_sans(domain_name, domain)
     return cfg
+
+
+def drop_unresolved_domains(config):
+    """Drop domain blocks whose name did not resolve to an actual domain name.
+
+    A block keyed on '${SOME_VAR}' stays in the configuration as long as the
+    variable is unset, and becomes an empty name once it is set to an empty
+    value. Both would end up as a broken nginx 'server_name', so such blocks are
+    treated as not configured and skipped.
+    """
+    domains = config.get("domains") if isinstance(config, dict) else None
+    if not isinstance(domains, dict):
+        return config
+
+    kept = {}
+    for domain_name, domain in domains.items():
+        if isinstance(domain_name, str):
+            if not domain_name.strip():
+                print("⏭️ Skipping domain block without a domain name")
+                continue
+            if ENV_VAR_PATTERN.search(domain_name):
+                print(f"⏭️ Skipping domain block '{domain_name}', it is not set")
+                continue
+        kept[domain_name] = domain
+
+    if domains and not kept:
+        print("❌ No domain is left after resolving the domain names")
+        print("👉 Please set the environment variables used as domain names")
+        raise SystemExit(4)
+
+    config["domains"] = kept
+    return config
 
 
 def expand_env_vars(value):

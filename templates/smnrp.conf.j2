@@ -21,7 +21,6 @@ add_header Content-Security-Policy "{{ csp_value }}" always;
 
 {% for domain_name, domain in domains.items() %}
 {% if not (certrequest and domain.get("disable_https", false)) %}
-{% set www_redirect_domain = "www." ~ domain_name if domain.get("redirect_www", false) and not domain_name.startswith("www.") else none %}
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
@@ -49,10 +48,12 @@ server {
   {% if "absolute_redirect" in domain %}
   absolute_redirect {{ "on" if domain.absolute_redirect else "off" }};
   {% endif %}
-  {% if www_redirect_domain and not certrequest and domain.disable_https %}
-  if ($host = {{ www_redirect_domain }}) {
+  {% if not certrequest and domain.disable_https %}
+  {% for redirect_host in domain.get("redirect_hosts", []) %}
+  if ($host = {{ redirect_host }}) {
     return 301 http://{{domain_name}}$request_uri;
   }
+  {% endfor %}
   {% endif %}
 
   {% if not domain.disable_https %}
@@ -83,11 +84,11 @@ server {
   {% if "absolute_redirect" in domain %}
   absolute_redirect {{ "on" if domain.absolute_redirect else "off" }};
   {% endif %}
-  {% if www_redirect_domain %}
-  if ($host = {{ www_redirect_domain }}) {
+  {% for redirect_host in domain.get("redirect_hosts", []) %}
+  if ($host = {{ redirect_host }}) {
     return 301 https://{{domain_name}}{{':' ~ domain.ports.exposed_https if domain.ports and domain.ports.exposed_https and domain.ports.exposed_https != '443'}}$request_uri;
   }
-  {% endif %}
+  {% endfor %}
 
   ssl_certificate "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem";
   ssl_certificate_key "/etc/letsencrypt/live/{{ domain_name }}/privkey.pem";

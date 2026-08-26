@@ -11,11 +11,28 @@ def get_www_redirect_domain(domain_name: str, domain) -> str | None:
     return f"www.{domain_name}"
 
 
+def get_redirect_hosts(domain_name: str, domain) -> list[str]:
+    # Host names that are served by this vhost but answered with a redirect to it,
+    # generated from 'redirect_www' and listed in 'redirect_from'.
+    redirect_hosts = []
+    www_redirect_domain = get_www_redirect_domain(domain_name, domain)
+    if www_redirect_domain:
+        redirect_hosts.append(www_redirect_domain)
+
+    for redirect_host in domain.get("redirect_from", []) or []:
+        if not redirect_host or redirect_host == domain_name:
+            continue
+        if redirect_host not in redirect_hosts:
+            redirect_hosts.append(redirect_host)
+
+    return redirect_hosts
+
+
 def get_effective_sans(domain_name: str, domain) -> list[str]:
     sans = list(domain.get("sans", []) or [])
-    www_redirect_domain = get_www_redirect_domain(domain_name, domain)
-    if www_redirect_domain and www_redirect_domain not in sans:
-        sans.append(www_redirect_domain)
+    for redirect_host in get_redirect_hosts(domain_name, domain):
+        if redirect_host not in sans:
+            sans.append(redirect_host)
     return sans
 
 

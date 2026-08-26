@@ -128,6 +128,28 @@ def test_get_grouped_domains_includes_redirect_www_domain_as_san():
     }
 
 
+def test_get_grouped_domains_includes_redirect_from_domains_as_sans():
+    cfg = Box(
+        {
+            "domains": {
+                "example.org": {
+                    "redirect_from": ["old.example.org"],
+                    "sans": [],
+                },
+            }
+        }
+    )
+
+    grouped = entrypoint.get_grouped_domains(cfg)
+
+    assert grouped == {
+        "example.org": [
+            {"domain": "example.org", "type": "vhost"},
+            {"domain": "old.example.org", "type": "san"},
+        ]
+    }
+
+
 def test_apply_defaults_sets_missing_and_preserves_existing_per_domain():
     cfg = Box({"domains": {"api.example.org": {"server_tokens": "on", "allow_tls1.2": True}}})
     applied = entrypoint.apply_defaults(cfg)
@@ -151,6 +173,49 @@ def test_apply_defaults_adds_redirect_www_domain_to_sans():
     assert applied.domains["example.org"]["sans"] == ["www.example.org"]
 
 
+def test_apply_defaults_adds_redirect_from_domains_to_sans_and_redirect_hosts():
+    cfg = Box(
+        {
+            "domains": {
+                "example.org": {"redirect_from": ["old.example.org"], "sans": ["a.example.org"]}
+            }
+        }
+    )
+
+    applied = entrypoint.apply_defaults(cfg)
+
+    domain = applied.domains["example.org"]
+    assert domain["sans"] == ["a.example.org", "old.example.org"]
+    assert domain["redirect_hosts"] == ["old.example.org"]
+
+
+def test_apply_defaults_combines_redirect_www_and_redirect_from():
+    cfg = Box(
+        {
+            "domains": {
+                "example.org": {
+                    "redirect_www": True,
+                    "redirect_from": ["old.example.org", "www.example.org", "example.org", ""],
+                }
+            }
+        }
+    )
+
+    applied = entrypoint.apply_defaults(cfg)
+
+    domain = applied.domains["example.org"]
+    assert domain["redirect_hosts"] == ["www.example.org", "old.example.org"]
+    assert domain["sans"] == ["www.example.org", "old.example.org"]
+
+
+def test_apply_defaults_keeps_redirect_hosts_absent_without_redirects():
+    cfg = Box({"domains": {"example.org": {}}})
+
+    applied = entrypoint.apply_defaults(cfg)
+
+    assert "redirect_hosts" not in applied.domains["example.org"]
+
+
 def test_schema_accepts_large_client_header_buffers():
     schema = yamale.make_schema(str(Path(__file__).resolve().parents[1] / "smnrp_schema.yml"))
     data = yamale.make_data(
@@ -171,6 +236,20 @@ def test_schema_accepts_redirect_www():
 domains:
   example.org:
     redirect_www: true
+"""
+    )
+
+    yamale.validate(schema, data)
+
+
+def test_schema_accepts_redirect_from():
+    schema = yamale.make_schema(str(Path(__file__).resolve().parents[1] / "smnrp_schema.yml"))
+    data = yamale.make_data(
+        content="""
+domains:
+  example.org:
+    redirect_from:
+      - old.example.org
 """
     )
 
@@ -330,6 +409,53 @@ def test_expand_env_vars_raises_on_duplicate_keys_after_expansion(monkeypatch):
 
     with pytest.raises(ValueError, match="Duplicate key after environment interpolation"):
         configuration.expand_env_vars(raw)
+
+
+def test_drop_unresolved_domains_skips_unset_and_empty_domain_names(capsys):
+    config = {
+        "domains": {
+            "example.org": {"cert": "own"},
+            "${SMNRPX_OLD_DOMAIN}": {"cert": "own"},
+            "www.${SMNRPX_OLD_DOMAIN}.org": {"cert": "own"},
+            "": {"cert": "own"},
+        }
+    }
+
+    filtered = configuration.drop_unresolved_domains(config)
+
+    assert list(filtered["domains"]) == ["example.org"]
+    out = capsys.readouterr().out
+    assert "${SMNRPX_OLD_DOMAIN}" in out
+
+
+def test_drop_unresolved_domains_keeps_resolved_domains_after_expansion(monkeypatch):
+    monkeypatch.setenv("SMNRPX_OLD_DOMAIN", "old.example.org")
+
+    raw = {
+        "domains": {
+            "example.org": {"cert": "own"},
+            "${SMNRPX_OLD_DOMAIN}": {"cert": "own"},
+        }
+    }
+
+    filtered = configuration.drop_unresolved_domains(configuration.expand_env_vars(raw))
+
+    assert list(filtered["domains"]) == ["example.org", "old.example.org"]
+
+
+def test_drop_unresolved_domains_raises_when_no_domain_is_left():
+    config = {"domains": {"${SMNRPX_DOMAIN}": {"cert": "own"}}}
+
+    with pytest.raises(SystemExit) as exc:
+        configuration.drop_unresolved_domains(config)
+
+    assert exc.value.code == 4
+
+
+def test_drop_unresolved_domains_keeps_configs_without_domains():
+    config = {"nginx": {"create_dhparams": True}}
+
+    assert configuration.drop_unresolved_domains(config) == config
 
 
 def test_create_dhparams_noop_when_target_exists(monkeypatch):

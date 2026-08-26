@@ -95,6 +95,9 @@ domains:
       - www.dom.org
     # Redirect www.dom.org to dom.org and include www.dom.org in the certificate
     redirect_www: true
+    # Former domains of this vhost, redirected to dom.org and included in the certificate
+    redirect_from:
+      - old.dom.org
     # Upstreams
     upstreams:
       # Name of the upstream (freely eligible)
@@ -286,6 +289,7 @@ A domain contains different `upstreams`, `locations` and additional configuratio
 - `large_client_header_buffers`: The large client header buffers setting.
 - `absolute_redirect`: true or false, to set nginx `absolute_redirect on|off` at server level. If omitted, nginx default behavior applies (on).
 - `redirect_www`: true or false, to redirect `www.<domain_name>` to `<domain_name>`. When enabled, SMNRP*X* also includes `www.<domain_name>` in the certificate SANs.
+- `redirect_from`: List of host names that are answered with a `301` to `<domain_name>`, keeping path and query. Typically former domains after a migration. Like `redirect_www`, these names are served by the same vhost, so SMNRP*X* adds them to the certificate SANs (with `cert: own` your mounted certificate needs to cover them). Entries equal to `<domain_name>` are ignored.
 - `allow_tls1.2`: true or false, if you want to support also tls1.2. Default only supports tls1.3
 - `disable_ocsp_stapling`: true or false, if you want to disable ocsp stapling. Default is false.
 - `oauth_url`: Optional oauth2-proxy base URL (for example `https://proxy.auth.nexus.ethz.ch/oauth2/`). If set, all `proxy` and `alias` locations get an auth check against `<oauth_url>/auth`. On `401`, requests are redirected to `/oauth2/start?rd=<original_url>`.
@@ -576,6 +580,30 @@ SMNRP_CERT=self-signed
 ```
 
 to replace the `${SMNRP_CERT}` in the config.
+
+### Optional domains
+
+A domain block whose name does not resolve to a domain is skipped, so blocks can be
+switched on and off with a single environment variable:
+
+```yaml
+domains:
+  dom.org: ...
+  ${SMNRP_OLD_DOMAIN}:
+    cert: own
+    locations:
+      - redirect:
+          uri: /
+          url: https://dom.org$request_uri
+```
+
+The block above is used as soon as `SMNRP_OLD_DOMAIN` holds a domain name. It is
+skipped while the variable is unset (the name stays `${SMNRP_OLD_DOMAIN}`) or set to
+an empty value, both of which would otherwise end up as a broken nginx `server_name`.
+SMNRP*X* logs every skipped block and fails if no domain is left.
+
+Note that a redirect like the one above needs its own certificate for the old domain.
+If one certificate can cover both names, prefer `redirect_from` on the primary domain.
 
 ## Apply custom configurations
 

@@ -578,3 +578,111 @@ def test_redirect_www_uses_http_when_https_is_disabled():
     assert "server_name example.org www.example.org;" in rendered
     assert "return 301 http://example.org$request_uri;" in rendered
     assert "return 301 https://example.org$request_uri;" not in rendered
+
+
+def test_redirect_from_adds_server_names_and_https_redirects():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "redirect_from": ["old.example.org", "legacy.example.com"],
+            }
+        },
+        with_defaults=True,
+    )
+
+    assert "server_name example.org old.example.org legacy.example.com;" in rendered
+    assert "if ($host = old.example.org) {" in rendered
+    assert "if ($host = legacy.example.com) {" in rendered
+    assert rendered.count("if ($host = ") == 2
+
+
+def test_redirect_from_combines_with_redirect_www():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "redirect_www": True,
+                "redirect_from": ["old.example.org"],
+            }
+        },
+        with_defaults=True,
+    )
+
+    assert "server_name example.org www.example.org old.example.org;" in rendered
+    assert "if ($host = www.example.org) {" in rendered
+    assert "if ($host = old.example.org) {" in rendered
+
+
+def test_redirect_from_uses_http_when_https_is_disabled():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "disable_https": True,
+                "redirect_from": ["old.example.org"],
+            }
+        },
+        with_defaults=True,
+    )
+
+    assert "server_name example.org old.example.org;" in rendered
+    assert "return 301 http://example.org$request_uri;" in rendered
+    assert "return 301 https://example.org$request_uri;" not in rendered
+
+
+def test_redirect_from_uses_exposed_https_port_in_redirect():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "redirect_from": ["old.example.org"],
+                "ports": {
+                    "exposed_https": 8443,
+                },
+            }
+        },
+        with_defaults=True,
+    )
+
+    assert "return 301 https://example.org:8443$request_uri;" in rendered
+
+
+def test_redirect_from_is_not_applied_during_certrequest():
+    rendered = _render_smnrp_conf(
+        {
+            "example.org": {
+                "redirect_from": ["old.example.org"],
+            }
+        },
+        certrequest=True,
+        with_defaults=True,
+    )
+
+    assert "server_name example.org old.example.org;" in rendered
+    assert "if ($host = old.example.org) {" not in rendered
+    assert "location /.well-known/acme-challenge/ {" in rendered
+
+
+def _render_csr_conf(domain_name: str, domain: dict) -> str:
+    env = Environment(
+        loader=FileSystemLoader(str(Path(__file__).resolve().parents[1] / "templates")),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    template = env.get_template("csr.conf.j2")
+    return template.render(domain_name=domain_name, domain=Box(domain))
+
+
+def test_csr_numbers_every_alt_name_and_includes_the_common_name():
+    rendered = _render_csr_conf(
+        "example.org",
+        {"sans": ["www.example.org", "old.example.org"]},
+    )
+
+    assert "DNS.1 = example.org" in rendered
+    assert "DNS.2 = www.example.org" in rendered
+    assert "DNS.3 = old.example.org" in rendered
+
+
+def test_csr_omits_alt_names_without_sans():
+    rendered = _render_csr_conf("example.org", {})
+
+    assert "alt_names" not in rendered
+    assert "CN = example.org" in rendered
