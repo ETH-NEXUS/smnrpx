@@ -25,8 +25,11 @@ subjectAltName = @alt_names
 [ alt_names ]
 {# 'set' does not survive a loop iteration, so the index comes from the loop itself. #}
 {# The common name has to be repeated here, clients ignore it once SANs are present. #}
-DNS.1 = {{ domain_name }}
+{% set ns = namespace(dns_index=1) %}
+DNS.{{ ns.dns_index }} = {{ domain_name }}
+{% set ns.dns_index = ns.dns_index + 1 %}
 {% for san in domain.sans %}
-DNS.{{ loop.index + 1 }} = {{ san }}
+DNS.{{ ns.dns_index }} = {{ san }}
+{% set ns.dns_index = ns.dns_index + 1 %}
 {% endfor %}
 {% endif %}
