@@ -121,33 +121,37 @@ def _process_domain_certificates(cfg: Box, env: Environment):
             live = f"{LIVE}/{domain_name}"
             makedirs(live, exist_ok=True)
             csr_config = path.join(live, "csr.conf")
-            with open(csr_config, "w", encoding="utf-8") as csr:
-                template = env.get_template("csr.conf.j2")
-                csr.write(template.render(domain_name=domain_name, domain=domain))
-            try:
-                cmd = [
-                    "openssl",
-                    "req",
-                    "-x509",
-                    "-nodes",
-                    "-days",
-                    "3650",
-                    "-newkey",
-                    "rsa:4096",
-                    "-keyout",
-                    path.join(live, "privkey.pem"),
-                    "-out",
-                    path.join(live, "fullchain.pem"),
-                    "-config",
-                    path.join(live, "csr.conf"),
-                ]
-                subprocess.run(cmd, check=True)
-            except subprocess.CalledProcessError as exc:
-                print(f"❌ Cannot create self-signed certificate for domain '{domain_name}'")
-                print("Certificate Signing Request Config:")
-                with open(path.join(live, "csr.conf"), encoding="utf-8") as handle:
-                    print(handle.read())
-                raise SystemExit(7) from exc
+            privkey = path.join(live, "privkey.pem")
+            fullchain = path.join(live, "fullchain.pem")
+            # Only create cert if it's not there yet
+            if not path.isfile(fullchain) or not path.isfile(privkey):
+                with open(csr_config, "w", encoding="utf-8") as csr:
+                    template = env.get_template("csr.conf.j2")
+                    csr.write(template.render(domain_name=domain_name, domain=domain))
+                try:
+                    cmd = [
+                        "openssl",
+                        "req",
+                        "-x509",
+                        "-nodes",
+                        "-days",
+                        "3650",
+                        "-newkey",
+                        "rsa:4096",
+                        "-keyout",
+                        path.join(live, "privkey.pem"),
+                        "-out",
+                        path.join(live, "fullchain.pem"),
+                        "-config",
+                        path.join(live, "csr.conf"),
+                    ]
+                    subprocess.run(cmd, check=True)
+                except subprocess.CalledProcessError as exc:
+                    print(f"❌ Cannot create self-signed certificate for domain '{domain_name}'")
+                    print("Certificate Signing Request Config:")
+                    with open(path.join(live, "csr.conf"), encoding="utf-8") as handle:
+                        print(handle.read())
+                    raise SystemExit(7) from exc
         elif "cert" in domain and domain.cert == "own":
             print(f"✅ using own certificate for domain '{domain_name}'")
 
