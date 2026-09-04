@@ -2,7 +2,7 @@
 # The tag fixes only the major version (nginx 1.x); the digest pins the exact
 # image. Dependabot keeps the digest fresh as 1.x minor/patch releases land
 # (see .github/dependabot.yml and the README).
-FROM nginx:1@sha256:8541484afbc9c8a5a8a99b379568ebbc957f658583ec9448fc43104229c03cf8 AS base
+FROM nginx:1@sha256:05b8cb60c354a44ab824ea6e7dc69b46d50762cdbe728a347a5b656e6fb3d7c4 AS base
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
   PIP_NO_CACHE_DIR=1 \
