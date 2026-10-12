@@ -1,8 +1,10 @@
 from pathlib import Path
 import re
+import subprocess
 
 from box import Box
 from jinja2 import Environment, FileSystemLoader
+import pytest
 
 from smnrpx.configuration import apply_defaults
 
@@ -681,8 +683,26 @@ def test_csr_numbers_every_alt_name_and_includes_the_common_name():
     assert "DNS.3 = old.example.org" in rendered
 
 
-def test_csr_omits_alt_names_without_sans():
-    rendered = _render_csr_conf("example.org", {})
-
-    assert "alt_names" not in rendered
-    assert "CN = example.org" in rendered
+@pytest.mark.parametrize("domain", [{}, {"sans": []}, {"sans": ["www.example.org"]}])
+def test_self_signed_certificate_includes_primary_hostname_san(tmp_path, domain):
+    config = tmp_path / "csr.conf"
+    config.write_text(_render_csr_conf("example.org", domain))
+    certificate = tmp_path / "fullchain.pem"
+    subprocess.run(
+        [
+            "openssl", "req", "-x509", "-nodes", "-days", "1",
+            "-newkey", "rsa:2048", "-keyout", str(tmp_path / "privkey.pem"),
+            "-out", str(certificate), "-config", str(config),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    result = subprocess.run(
+        ["openssl", "x509", "-in", str(certificate), "-noout", "-ext", "subjectAltName"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "DNS:example.org" in result.stdout
+    for san in domain.get("sans", []):
+        assert f"DNS:{san}" in result.stdout

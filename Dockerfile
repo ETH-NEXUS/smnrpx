@@ -1,4 +1,4 @@
-# Pinned by digest for reproducible builds.
+# Base image pinned by digest; OS packages are updated during each build.
 # The tag fixes only the major version (nginx 1.x); the digest pins the exact
 # image. Dependabot keeps the digest fresh as 1.x minor/patch releases land
 # (see .github/dependabot.yml and the README).
@@ -16,12 +16,13 @@ USER root
 # are persistent
 VOLUME /etc/letsencrypt
 
-# Install OS requirements and clean apt metadata in the same layer.
+# Upgrade OS packages, install requirements, and clean apt metadata in the same layer.
 #   apache2-utils -> htpasswd (basic-auth files)
 #   certbot       -> Let's Encrypt certificate requests/renewals (webroot)
 #   python3/pip   -> run the smnrpx entrypoint
 # (openssl for dhparams/self-signed certs is already provided by the base image)
 RUN apt-get update \
+  && apt-get upgrade -y \
   && apt-get install -y --no-install-recommends \
     apache2-utils \
     certbot \
