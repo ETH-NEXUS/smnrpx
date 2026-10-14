@@ -88,4 +88,5 @@ jobs:
           destination_container_repo: ethnexus/smnrpx
           provider: dockerhub
           short_description: "Secure Multifunctional Nginx Reverse Proxy"
-          readme_file: "README.md"
+          # Docker Hub allows at most 25000 bytes, so it gets a short page that links to README.md.
+          readme_file: "DOCKERHUB.md"
