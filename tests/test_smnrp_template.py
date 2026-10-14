@@ -353,6 +353,53 @@ def test_ocsp_stapling_is_enabled_by_default_for_letsencrypt_and_can_be_disabled
     assert "ssl_stapling on;" not in rendered_disabled
 
 
+def test_host_sni_check_is_rendered_only_in_the_https_server():
+    rendered = _render_smnrp_conf({"example.org": {}}, with_defaults=True)
+    http_server, https_server = rendered.split("listen 443 ssl;")
+
+    assert "if ($host != $ssl_server_name) {" in https_server
+    assert "return 421;" in https_server
+    assert "$ssl_server_name" not in http_server
+    assert rendered.count("if ($host != $ssl_server_name) {") == 1
+
+
+def test_host_sni_check_can_be_disabled_per_domain():
+    rendered = _render_smnrp_conf(
+        {
+            "strict.example.org": {},
+            "relaxed.example.org": {"allow_host_sni_mismatch": True},
+        },
+        with_defaults=True,
+    )
+
+    assert rendered.count("if ($host != $ssl_server_name) {") == 1
+    relaxed = rendered.split("server_name relaxed.example.org;")[-1]
+    assert "$ssl_server_name" not in relaxed
+
+
+def test_host_sni_check_is_not_rendered_without_https():
+    rendered_http_only = _render_smnrp_conf(
+        {"example.org": {"disable_https": True}}, with_defaults=True
+    )
+    rendered_certrequest = _render_smnrp_conf(
+        {"example.org": {}}, certrequest=True, with_defaults=True
+    )
+
+    assert "$ssl_server_name" not in rendered_http_only
+    assert "$ssl_server_name" not in rendered_certrequest
+
+
+def test_host_sni_check_comes_before_redirect_hosts():
+    rendered = _render_smnrp_conf(
+        {"example.org": {"redirect_www": True}}, with_defaults=True
+    )
+    https_server = rendered.split("listen 443 ssl;")[1]
+
+    assert https_server.index("if ($host != $ssl_server_name) {") < https_server.index(
+        "if ($host = www.example.org) {"
+    )
+
+
 def test_disable_cache_keeps_security_headers_in_location_context():
     rendered = _render_smnrp_conf(
         {

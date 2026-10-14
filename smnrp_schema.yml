@@ -22,6 +22,7 @@ domain:
   absolute_redirect: bool(required=False)
   allow_tls1.2: bool(required=False)
   disable_ocsp_stapling: bool(required = False)
+  allow_host_sni_mismatch: bool(required=False)
   oauth_url: str(required=False)
 
   locations: list(include('location'), required=False)

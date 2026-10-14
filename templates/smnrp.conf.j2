@@ -84,6 +84,12 @@ server {
   {% if "absolute_redirect" in domain %}
   absolute_redirect {{ "on" if domain.absolute_redirect else "off" }};
   {% endif %}
+  {% if not domain.get("allow_host_sni_mismatch", false) %}
+  # The Host must match the TLS server name, so a name allowed by a TLS router cannot reach another vhost.
+  if ($host != $ssl_server_name) {
+    return 421;
+  }
+  {% endif %}
   {% for redirect_host in domain.get("redirect_hosts", []) %}
   if ($host = {{ redirect_host }}) {
     return 301 https://{{domain_name}}{{':' ~ domain.ports.exposed_https if domain.ports and domain.ports.exposed_https and domain.ports.exposed_https != '443'}}$request_uri;
