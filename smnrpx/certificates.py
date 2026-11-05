@@ -29,7 +29,8 @@ def cert_renew():
             stderr=subprocess.PIPE,
             text=True,
         )
-        out, err = certbot.communicate(timeout=1)
+        # No timeout: certbot needs many seconds, and a TimeoutExpired here ended renewals for good.
+        out, err = certbot.communicate()
         print(f"{out}")
         if certbot.poll() != 0:
             print(f"{err}")
