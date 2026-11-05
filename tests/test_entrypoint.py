@@ -497,6 +497,37 @@ def test_create_dhparams_raises_when_openssl_fails(monkeypatch):
     assert exc.value.code == 6
 
 
+def test_cert_renew_waits_for_certbot_and_keeps_running(monkeypatch):
+    class StopLoop(Exception):
+        pass
+
+    sleeps = []
+    communicate_calls = []
+
+    def fake_sleep(_seconds):
+        sleeps.append(_seconds)
+        if len(sleeps) > 2:
+            raise StopLoop
+
+    class SlowCertbot:
+        def communicate(self, timeout=None):
+            # A real renewal takes longer than any short timeout; it must not be cut off.
+            communicate_calls.append(timeout)
+            return ("renewed", "")
+
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(certificates, "sleep", fake_sleep)
+    monkeypatch.setattr(certificates.subprocess, "Popen", lambda *_args, **_kwargs: SlowCertbot())
+    monkeypatch.setattr(certificates.path, "isfile", lambda _: False)
+
+    with pytest.raises(StopLoop):
+        certificates.cert_renew()
+
+    assert communicate_calls == [None, None]
+
+
 def test_handle_cert_request_builds_d_argument_without_trailing_comma(monkeypatch):
     calls = []
 
