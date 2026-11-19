@@ -753,3 +753,23 @@ def test_self_signed_certificate_includes_primary_hostname_san(tmp_path, domain)
     assert "DNS:example.org" in result.stdout
     for san in domain.get("sans", []):
         assert f"DNS:{san}" in result.stdout
+
+
+def test_server_tokens_is_rendered_in_the_http_and_the_https_server():
+    rendered = _render_smnrp_conf({"example.org": {}}, with_defaults=True)
+    http_server, https_server = rendered.split("listen 443 ssl;")
+
+    assert "server_tokens off;" in http_server
+    assert "server_tokens off;" in https_server
+
+
+def test_server_tokens_is_rendered_in_the_certrequest_server():
+    rendered = _render_smnrp_conf({"example.org": {}}, certrequest=True, with_defaults=True)
+
+    assert rendered.count("server_tokens off;") == 1
+
+
+def test_server_tokens_is_rendered_once_without_https():
+    rendered = _render_smnrp_conf({"example.org": {"disable_https": True}}, with_defaults=True)
+
+    assert rendered.count("server_tokens off;") == 1

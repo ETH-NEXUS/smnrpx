@@ -112,7 +112,7 @@ domains:
     # The Content Security Policy for this domain
     csp: default-src 'self' http: https: data: blob: 'unsafe-inline'
     # Hardening parameters (please read the details below)
-    server_tokens: off
+    server_tokens: 'off'
     proxy_buffer_size: 32k
     client_max_body_size: 1m
     client_body_buffer_size: 1k
@@ -758,10 +758,10 @@ client_max_body_size: 1m
 
 ### `server_tokens`
 
-Set the `server_tokens` parameter for this server, default is `off`.
+Set the `server_tokens` parameter for the http and the https server of this domain, default is `off`. Quote the value: YAML reads a plain `off` or `on` as a boolean, and the config check then rejects it.
 
 ```bash
-server_tokens: off
+server_tokens: 'off'
 ```
 
 ### `client_body_buffer_size`

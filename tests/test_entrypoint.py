@@ -7,6 +7,7 @@ from box import Box
 
 import entrypoint
 from smnrpx import app
+from smnrpx import assets
 from smnrpx import certificates
 from smnrpx import configuration
 from smnrpx import nginx_runtime
@@ -665,3 +666,45 @@ def test_remove_default_nginx_conf_removes_existing_file(tmp_path):
     nginx_runtime.remove_default_nginx_conf(str(base))
 
     assert not default_conf.exists()
+
+
+def _use_tmp_asset_dirs(monkeypatch, tmp_path):
+    default_files = tmp_path / "defaults"
+    default_files.mkdir()
+    (default_files / "index.html").write_text("default page", encoding="utf-8")
+    monkeypatch.setattr(assets, "WEB_ROOT", str(tmp_path / "web_root"))
+    monkeypatch.setattr(assets, "DEFAULT_FILES", str(default_files))
+    return tmp_path / "web_root" / "example.org" / "index.html"
+
+
+def test_populate_if_not_exists_copies_a_missing_default_file(monkeypatch, tmp_path):
+    target = _use_tmp_asset_dirs(monkeypatch, tmp_path)
+
+    assets.populate_if_not_exists("example.org", "index.html")
+
+    assert target.read_text(encoding="utf-8") == "default page"
+
+
+def test_populate_if_not_exists_keeps_an_existing_file(monkeypatch, tmp_path):
+    target = _use_tmp_asset_dirs(monkeypatch, tmp_path)
+    target.parent.mkdir(parents=True)
+    target.write_text("app page", encoding="utf-8")
+
+    assets.populate_if_not_exists("example.org", "index.html")
+
+    assert target.read_text(encoding="utf-8") == "app page"
+
+
+@pytest.mark.parametrize("failing_call", ["makedirs", "copy"])
+def test_populate_if_not_exists_warns_when_the_web_root_is_not_writable(monkeypatch, tmp_path, capsys, failing_call):
+    target = _use_tmp_asset_dirs(monkeypatch, tmp_path)
+
+    def denied(*_args, **_kwargs):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(assets, failing_call, denied)
+
+    assets.populate_if_not_exists("example.org", "index.html")
+
+    assert not target.exists()
+    assert "cannot copy the default index.html" in capsys.readouterr().out

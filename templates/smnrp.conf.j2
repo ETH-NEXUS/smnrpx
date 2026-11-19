@@ -57,6 +57,10 @@ server {
   {% endif %}
 
   {% if not domain.disable_https %}
+  {# Without HTTPS this server continues below and gets server_tokens there. #}
+  {% if domain.server_tokens %}
+  server_tokens {{ domain.server_tokens }};
+  {% endif %}
   {% if certrequest %}
   location /.well-known/acme-challenge/ {
     root /var/www/certbot;
